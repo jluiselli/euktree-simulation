@@ -48,10 +48,10 @@ class Population:
     def generate_from_child_population(self, child_pop):
         
         for indiv in child_pop.individuals.values():
-            par1_id = my_randint(0,self.size-1)             #random.randint(0,self.size-1)
-            par2_id = my_randint(0,self.size-1)                                #random.randint(0,self.size-1)
+            par1_id = my_randint(1,self.size-1)             #random.randint(0,self.size-1)
+            par2_id = my_randint(1,self.size-1)                                #random.randint(0,self.size-1)
             while par1_id == par2_id:
-                par2_id = my_randint(0, self.size-1)        #random.randint(0,self.size-1)
+                par2_id = my_randint(1, self.size-1)        #random.randint(0,self.size-1)
                 
             if par1_id not in self.individuals:
                 self.individuals[par1_id] = Individual(par1_id, None, None, self.chrsm_len)
@@ -110,14 +110,14 @@ class Lineage:
                     # Le chromosome qu’on va suivre est donc celui de "droite" d’avant
                     # a et b restent inchangés
                     next_segments.append( Segment(par_id, 1, segment.a, segment.b) )
-                elif recomb_pos >= segment.b:
+                elif recomb_pos > segment.b:
                     # La coupure était en-dessous du segment qu’on suit
                     # Le chromosome qu’on va suivre est donc celui de "gauche"
                     # a et b restent inchangés
                     next_segments.append( Segment(par_id, 0, segment.a, segment.b) )
                 else: # Coupure dans le segment d’intérêt : on doit suivre 2 segments
                     # De a à la coupure, ça vient de "gauche"
-                    next_segments.append( Segment(par_id, 0, segment.a, recomb_pos) )
+                    next_segments.append( Segment(par_id, 0, segment.a, recomb_pos-1) )
                     # De la coupure à b, ça vient de "droite"
                     next_segments.append( Segment(par_id, 1, recomb_pos, segment.b) )
                     self.has_separated = True
@@ -128,14 +128,14 @@ class Lineage:
                     # Le chromosome qu’on va suivre est donc celui de "gauche" d’avant
                     # a et b restent inchangés
                     next_segments.append( Segment(par_id, 0, segment.a, segment.b) )
-                elif recomb_pos >= segment.b:
+                elif recomb_pos > segment.b:
                     # La coupure était en-dessous du segment qu’on suit
                     # Le chromosome qu’on va suivre est donc celui de "droite"
                     # a et b restent inchangés
                     next_segments.append( Segment(par_id, 1, segment.a, segment.b) )
                 else: # Coupure dans le segment d’intérêt : on doit suivre 2 segments
                     # De a à la coupure, ça vient de "droite"
-                    next_segments.append( Segment(par_id, 1, segment.a, recomb_pos) )
+                    next_segments.append( Segment(par_id, 1, segment.a, recomb_pos-1) )
                     # De la coupure à b, ça vient de "gauche"
                     next_segments.append( Segment(par_id, 0, recomb_pos, segment.b) )
                     self.has_separated = True
@@ -165,7 +165,7 @@ class Lineage:
             #if seg[i] is right next to seg[i-1], on the same indiv and chrsm, fuse it --> index i - 1 will get deleted later on
             if (self.cur_segments[i].indiv_id == self.cur_segments[i - 1].indiv_id and 
                self.cur_segments[i].chrsm == self.cur_segments[i - 1].chrsm and 
-               self.cur_segments[i].a <= self.cur_segments[i - 1].b): 
+               self.cur_segments[i].a <= self.cur_segments[i - 1].b+1):
                
                 self.cur_segments[i].a = self.cur_segments[i - 1].a
                 indices_to_delete.add(i - 1)
