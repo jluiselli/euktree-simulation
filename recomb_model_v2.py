@@ -13,8 +13,8 @@ def my_randint(m1, m2):
 class Individual:
     def __init__(self, id, parent1, parent2, chrsm_len):
         # Positions de recombinaisons
-        self.recomb_par1 = my_randint(1,chrsm_len)     #random.randint(1,chrsm_len)
-        self.recomb_par2 = my_randint(1,chrsm_len)     #random.randint(1,chrsm_len)
+        self.recomb_par1 = my_randint(1,chrsm_len-1)     #random.randint(1,chrsm_len)
+        self.recomb_par2 = my_randint(1,chrsm_len-1)     #random.randint(1,chrsm_len)
         
         self.par1_gave_chrsm = my_randint(0, 1) #random.randint(0,1)
         self.par2_gave_chrsm = my_randint(0, 1) #random.randint(0,1)
