@@ -188,10 +188,21 @@ class Lineage:
         
         #it is apparently faster to delete a list of indices by recreating the array but omitting deleted indices
         tmp_segments = []
+        genetic_mat = 0
         for i in range(len(self.cur_segments)):
             if i not in indices_to_delete:
                 tmp_segments.append(self.cur_segments[i])
+                genetic_mat += self.cur_segments[i].b-self.cur_segments[i].a+1
+
         self.cur_segments = tmp_segments
+
+        self.nb_segments.append(len(self.cur_segments))
+        self.nb_ancestors.append(len(self.pop.individuals))
+        self.genetic_mat.append(genetic_mat)
+
+        if genetic_mat < self.pop.chrsm_len:
+            for seg in self.cur_segments:
+                seg.print()
         
         
     
