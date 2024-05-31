@@ -69,6 +69,9 @@ class Segment:
         self.a = a
         self.b = b
 
+    def print(self):
+        print(self.indiv_id, self.chrsm, self.a, self.b)
+
 
 class Lineage:
     def __init__(self,indiv_id, chrsm, a, b, initial_pop):
