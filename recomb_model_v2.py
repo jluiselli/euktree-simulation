@@ -250,15 +250,20 @@ class Lineage:
     
     
     def write_data(self,filename):
-        d = {"population_size" : self.pop.size,
-             "chrsm_length" : self.pop.chrsm_len,
-             "seg_len" : self.start_segment[1] - self.start_segment[0],
-             "start_indiv" : self.start_indiv,
-             "start_chrsm" : self.start_chrsm,
-             "start_position" : self.start_segment[0],
-             "total_generations" : self.pop.T,
-             "nb_ancestors" : list(self.nb_ancestors),
-             "nb_segments" : list(self.nb_segments)}
+        d = {"nb_ancestors" : list(self.nb_ancestors),
+             "nb_segments" : list(self.nb_segments),
+             "genetic_mat" : list(self.genetic_mat)}
+        json_object = json.dumps(d)
+        with open(filename, "w") as outfile:
+            outfile.write(json_object)
+
+    def write_all_distrib(self, filename):
+
+        d = {"indiv_id" : [seg.indiv_id for seg in self.cur_segments],
+             "chrsm" :    [seg.chrsm for seg in self.cur_segments],
+             "a" :        [seg.a for seg in self.cur_segments],
+             "b" :        [seg.b for seg in self.cur_segments],
+             "time" : self.back_time}
         json_object = json.dumps(d)
         with open(filename, "w") as outfile:
             outfile.write(json_object)
