@@ -74,18 +74,30 @@ class Segment:
 
 
 class Lineage:
-    def __init__(self,indiv_id, chrsm, a, b, initial_pop):
-        self.start_indiv = indiv_id 
-        self.start_chrsm = chrsm    #useful?
-        
+    def __init__(self, initial_pop, seg_list=None):
         self.pop = initial_pop
         self.back_time = 0
         
-        self.cur_segments = [ Segment(indiv_id, chrsm, a, b)  ]
+        if seg_list != None:
+            self.cur_segments = seg_list # [ Segment(indiv_id, chrsm, a, b)]
+        else: # We follow the whole population
+            self.cur_segments = []
+            for indiv_id in range(self.pop.size):
+                self.cur_segments.append(Segment(indiv_id, 0, 0, self.pop.chrsm_len-1))
+                self.cur_segments.append(Segment(indiv_id, 1, 0, self.pop.chrsm_len-1))
+
+        self.nb_segments = [len(self.cur_segments)]
+        anc_list = []
+        nb_bases = 0
+        for seg in self.cur_segments:
+            nb_bases += seg.b - seg.a +1
+            if not seg.indiv_id in anc_list:
+                anc_list.append(seg.indiv_id)
+        self.nb_ancestors = [len(anc_list)]
+        self.genetic_mat = [nb_bases]
+
         self.has_separated = False
-        
-        #self.nb_segments = np.zeros(pop.T)
-        #self.nb_ancestors = np.zeros(pop.T)
+
 
     def backward_step(self):
         next_segments = []  #next going backwards in time
