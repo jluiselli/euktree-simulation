@@ -171,6 +171,7 @@ class Lineage:
                self.cur_segments[i].a <= self.cur_segments[i - 1].b+1):
                
                 self.cur_segments[i].a = self.cur_segments[i - 1].a
+                self.cur_segments[i].b = max(self.cur_segments[i - 1].b,self.cur_segments[i].b)
                 indices_to_delete.add(i - 1)
         
         #it is apparently faster to delete a list of indices by recreating the array but omitting deleted indices
