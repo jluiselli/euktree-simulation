@@ -11,10 +11,11 @@ def my_randint(m1, m2):
 
 
 class Individual:
-    def __init__(self, id, parent1, parent2, chrsm_len):
+    def __init__(self, id, parent1, parent2, chrsm_len, recomb_rate):
+        nb_recomb = np.random.binomial(chrsm_len, recomb_rate)
         # Positions de recombinaisons
-        self.recomb_par1 = my_randint(1,chrsm_len-1)     #random.randint(1,chrsm_len)
-        self.recomb_par2 = my_randint(1,chrsm_len-1)     #random.randint(1,chrsm_len)
+        self.recomb_par1 = [my_randint(1,chrsm_len-1) for _ in range(nb_recomb)]     #random.randint(1,chrsm_len)
+        self.recomb_par2 = [my_randint(1,chrsm_len-1) for _ in range(nb_recomb)]     #random.randint(1,chrsm_len)
         
         self.par1_gave_chrsm = my_randint(0, 1) #random.randint(0,1)
         self.par2_gave_chrsm = my_randint(0, 1) #random.randint(0,1)
@@ -38,10 +39,11 @@ class Individual:
 
 
 class Population:
-    def __init__(self, size, chrsm_len):
+    def __init__(self, size, chrsm_len, recomb_rate):
         self.size = size
         self.individuals = {}   #dict that only contains active indivs, key = indiv_id, value = Individual object
         self.chrsm_len = chrsm_len
+        self.r = recomb_rate
 
     #this is the previous forward_step, now it generates the parent indivs from the child indivs
     #side effect: child_pop indivs get parent1 and parent2 assigned
@@ -54,9 +56,9 @@ class Population:
                 par2_id = my_randint(1, self.size-1)        #random.randint(0,self.size-1)
                 
             if par1_id not in self.individuals:
-                self.individuals[par1_id] = Individual(par1_id, None, None, self.chrsm_len)
+                self.individuals[par1_id] = Individual(par1_id, None, None, self.chrsm_len, self.r)
             if par2_id not in self.individuals:
-                self.individuals[par2_id] = Individual(par2_id, None, None, self.chrsm_len)
+                self.individuals[par2_id] = Individual(par2_id, None, None, self.chrsm_len, self.r)
             
             indiv.parent1_id = par1_id
             indiv.parent2_id = par2_id
@@ -101,7 +103,7 @@ class Lineage:
 
     def backward_step(self):
         next_segments = []  #next going backwards in time
-        next_pop = Population(self.pop.size, self.pop.chrsm_len)
+        next_pop = Population(self.pop.size, self.pop.chrsm_len, self.pop.r)
         next_pop.generate_from_child_population(self.pop)
         
         #print(self.pop.individuals.keys())
@@ -111,50 +113,36 @@ class Lineage:
             if segment.chrsm == 0: # chrsm A : from parent 1
                 par_gave_chrsm =  self.pop.individuals[segment.indiv_id].par1_gave_chrsm
                 par_id =  self.pop.individuals[segment.indiv_id].parent1_id
-                recomb_pos =  self.pop.individuals[segment.indiv_id].recomb_par1
+                recomb_pos_list =  self.pop.individuals[segment.indiv_id].recomb_par1
             else: # chrsm B : from parent 2
                 par_gave_chrsm =  self.pop.individuals[segment.indiv_id].par2_gave_chrsm
                 par_id =  self.pop.individuals[segment.indiv_id].parent2_id
-                recomb_pos =  self.pop.individuals[segment.indiv_id].recomb_par2
+                recomb_pos_list =  self.pop.individuals[segment.indiv_id].recomb_par2
                 
             
             if par_gave_chrsm == 0:
                 # Le parent a donné le chrsm de gauche après la recombinaison
-                if recomb_pos <= segment.a:
-                    # La coupure était au-dessus du segment qu’on suit
-                    # Le chromosome qu’on va suivre est donc celui de "droite" d’avant
-                    # a et b restent inchangés
-                    next_segments.append( Segment(par_id, 1, segment.a, segment.b) )
-                elif recomb_pos > segment.b:
-                    # La coupure était en-dessous du segment qu’on suit
-                    # Le chromosome qu’on va suivre est donc celui de "gauche"
-                    # a et b restent inchangés
-                    next_segments.append( Segment(par_id, 0, segment.a, segment.b) )
-                else: # Coupure dans le segment d’intérêt : on doit suivre 2 segments
-                    # De a à la coupure, ça vient de "gauche"
-                    next_segments.append( Segment(par_id, 0, segment.a, recomb_pos-1) )
-                    # De la coupure à b, ça vient de "droite"
-                    next_segments.append( Segment(par_id, 1, recomb_pos, segment.b) )
-                    self.has_separated = True
+                # start_chrsm = 0
+                start_chrsm = (len([pos for pos in recomb_pos_list if pos <= segment.a]) % 2 ) == 1
             else:
                 # Le parent a donné le chrsm de droite après la recombinaison
-                if recomb_pos <= segment.a:
-                    # La coupure était au-dessus du segment qu’on suit
-                    # Le chromosome qu’on va suivre est donc celui de "gauche" d’avant
-                    # a et b restent inchangés
-                    next_segments.append( Segment(par_id, 0, segment.a, segment.b) )
-                elif recomb_pos > segment.b:
-                    # La coupure était en-dessous du segment qu’on suit
-                    # Le chromosome qu’on va suivre est donc celui de "droite"
-                    # a et b restent inchangés
-                    next_segments.append( Segment(par_id, 1, segment.a, segment.b) )
-                else: # Coupure dans le segment d’intérêt : on doit suivre 2 segments
-                    # De a à la coupure, ça vient de "droite"
-                    next_segments.append( Segment(par_id, 1, segment.a, recomb_pos-1) )
-                    # De la coupure à b, ça vient de "gauche"
-                    next_segments.append( Segment(par_id, 0, recomb_pos, segment.b) )
-                    self.has_separated = True
+                # start_chrsm = 1
+                start_chrsm = (len([pos for pos in recomb_pos_list if pos <= segment.a]) % 2 ) == 0
 
+            nb_recomb_in_seg = len([pos for pos in recomb_pos_list if (pos > segment.a and pos <= segment.b)])
+            if nb_recomb_in_seg == 0:
+                # Pas de coupure du segment suivi
+                # le chromosome où on l’envoie dépend seulement du nombre de coupures *avant*
+                next_segments.append(Segment(par_id, start_chrsm, segment.a, segment.b))
+            else: # le segment est coup en x morceaux
+                self.has_separated = True
+                positions = [segment.a]
+                for pos in [pos for pos in recomb_pos_list if (pos > segment.a and pos <= segment.b)]:
+                    positions.append(pos)
+                positions.append(segment.b)
+                for i in range(nb_recomb_in_seg + 1):
+                    next_segments.append(Segment(par_id, start_chrsm, positions[i], positions[i+1]))
+                    start_chrsm = abs(start_chrsm - 1)
             
         self.back_time += 1
         
