@@ -54,10 +54,10 @@ class Population:
     def generate_from_child_population(self, child_pop, to_check):
         
         for indiv in child_pop.individuals.values():
-            par1_id = my_randint(1,self.size-1)             #random.randint(0,self.size-1)
-            par2_id = my_randint(1,self.size-1)                                #random.randint(0,self.size-1)
+            par1_id = my_randint(0,self.size-1)             #random.randint(0,self.size-1)
+            par2_id = my_randint(0,self.size-1)                                #random.randint(0,self.size-1)
             while par1_id == par2_id:
-                par2_id = my_randint(1, self.size-1)        #random.randint(0,self.size-1)
+                par2_id = my_randint(0, self.size-1)        #random.randint(0,self.size-1)
                 
             if par1_id not in self.individuals:
                 self.individuals[par1_id] = Individual(par1_id, None, None, self.chrsm_len, self.r, indiv)
