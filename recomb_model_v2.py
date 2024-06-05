@@ -11,7 +11,7 @@ def my_randint(m1, m2):
 
 
 class Individual:
-    def __init__(self, id, parent1, parent2, chrsm_len, recomb_rate):
+    def __init__(self, id, parent1, parent2, chrsm_len, recomb_rate, child):
         nb_recomb = np.random.binomial(chrsm_len, recomb_rate)
         # Positions de recombinaisons
         self.recomb_par1 = [my_randint(1,chrsm_len-1) for _ in range(nb_recomb)]     #random.randint(1,chrsm_len)
@@ -19,6 +19,10 @@ class Individual:
         
         self.par1_gave_chrsm = my_randint(0, 1) #random.randint(0,1)
         self.par2_gave_chrsm = my_randint(0, 1) #random.randint(0,1)
+        if child != None:
+            self.final_desc = child.final_desc
+        else:
+            self.final_desc = [id]
         
         # Les chromosomes, après recombinaison, sont à "droite" ou à "gauche"
         #                  (gauche) 0  1 (droite)
@@ -47,7 +51,7 @@ class Population:
 
     #this is the previous forward_step, now it generates the parent indivs from the child indivs
     #side effect: child_pop indivs get parent1 and parent2 assigned
-    def generate_from_child_population(self, child_pop):
+    def generate_from_child_population(self, child_pop, to_check):
         
         for indiv in child_pop.individuals.values():
             par1_id = my_randint(1,self.size-1)             #random.randint(0,self.size-1)
@@ -56,9 +60,14 @@ class Population:
                 par2_id = my_randint(1, self.size-1)        #random.randint(0,self.size-1)
                 
             if par1_id not in self.individuals:
-                self.individuals[par1_id] = Individual(par1_id, None, None, self.chrsm_len, self.r)
+                self.individuals[par1_id] = Individual(par1_id, None, None, self.chrsm_len, self.r, indiv)
+            elif to_check:
+                self.individuals[par1_id].final_desc[0:0] = indiv.final_desc
+
             if par2_id not in self.individuals:
-                self.individuals[par2_id] = Individual(par2_id, None, None, self.chrsm_len, self.r)
+                self.individuals[par2_id] = Individual(par2_id, None, None, self.chrsm_len, self.r, indiv)
+            elif to_check:
+                self.individuals[par2_id].final_desc[0:0] = indiv.final_desc
             
             indiv.parent1_id = par1_id
             indiv.parent2_id = par2_id
@@ -99,12 +108,14 @@ class Lineage:
         self.genetic_mat = [nb_bases]
 
         self.has_separated = False
+        self.first_common_anc = 0
+        self.all_common_anc = 0
 
 
     def backward_step(self):
         next_segments = []  #next going backwards in time
         next_pop = Population(self.pop.size, self.pop.chrsm_len, self.pop.r)
-        next_pop.generate_from_child_population(self.pop)
+        next_pop.generate_from_child_population(self.pop, self.all_common_anc == 0)
         
         #print(self.pop.individuals.keys())
         #at this point, each indiv in self.pop must has parent1_id and parent2_id set
@@ -156,6 +167,23 @@ class Lineage:
             if s.indiv_id not in self.pop.individuals:
                 self.pop.individuals[s.indiv_id] = next_pop.individuals[s.indiv_id]
             
+        if self.all_common_anc == 0:
+            min_nb_desc, max_nb_desc = self.pop.size, 0
+            for indiv in self.pop.individuals.values():
+                indiv.final_desc = list(set(indiv.final_desc))
+                nb_desc = len(indiv.final_desc)
+                if nb_desc < min_nb_desc:
+                    min_nb_desc = nb_desc
+                if nb_desc > max_nb_desc:
+                    max_nb_desc = nb_desc
+            if self.first_common_anc == 0 and max_nb_desc == self.pop.size:
+                print("Most recent common ancestor of the population at time ", self.back_time)
+                self.first_common_anc = self.back_time
+            if min_nb_desc == self.pop.size:
+                print("All common ancestor of the population at time ", self.back_time)
+                self.all_common_anc = self.back_time
+            print("min", min_nb_desc, "max", max_nb_desc)
+
     
     #side effect: sorts self.cur_segments
     def check_fused_segments(self):
