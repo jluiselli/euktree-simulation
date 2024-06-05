@@ -140,6 +140,7 @@ class Lineage:
                 for pos in [pos for pos in recomb_pos_list if (pos > segment.a and pos <= segment.b)]:
                     positions.append(pos)
                 positions.append(segment.b)
+                positions.sort()
                 for i in range(nb_recomb_in_seg + 1):
                     next_segments.append(Segment(par_id, start_chrsm, positions[i], positions[i+1]))
                     start_chrsm = abs(start_chrsm - 1)
