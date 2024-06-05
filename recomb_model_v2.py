@@ -134,11 +134,11 @@ class Lineage:
             if par_gave_chrsm == 0:
                 # Le parent a donné le chrsm de gauche après la recombinaison
                 # start_chrsm = 0
-                start_chrsm = (len([pos for pos in recomb_pos_list if pos <= segment.a]) % 2 ) == 1
+                start_chrsm = int((len([pos for pos in recomb_pos_list if pos <= segment.a]) % 2 ) == 1)
             else:
                 # Le parent a donné le chrsm de droite après la recombinaison
                 # start_chrsm = 1
-                start_chrsm = (len([pos for pos in recomb_pos_list if pos <= segment.a]) % 2 ) == 0
+                start_chrsm = int((len([pos for pos in recomb_pos_list if pos <= segment.a]) % 2 ) == 0)
 
             nb_recomb_in_seg = len([pos for pos in recomb_pos_list if (pos > segment.a and pos <= segment.b)])
             if nb_recomb_in_seg == 0:
