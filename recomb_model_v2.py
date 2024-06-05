@@ -14,8 +14,8 @@ class Individual:
     def __init__(self, id, parent1, parent2, chrsm_len, recomb_rate, child):
         nb_recomb = np.random.binomial(chrsm_len, recomb_rate)
         # Positions de recombinaisons
-        self.recomb_par1 = [my_randint(1,chrsm_len-1) for _ in range(nb_recomb)]     #random.randint(1,chrsm_len)
-        self.recomb_par2 = [my_randint(1,chrsm_len-1) for _ in range(nb_recomb)]     #random.randint(1,chrsm_len)
+        self.recomb_par1 = list(set([my_randint(1,chrsm_len-1) for _ in range(nb_recomb)]))     #random.randint(1,chrsm_len)
+        self.recomb_par2 = list(set([my_randint(1,chrsm_len-1) for _ in range(nb_recomb)]))     #random.randint(1,chrsm_len)
         
         self.par1_gave_chrsm = my_randint(0, 1) #random.randint(0,1)
         self.par2_gave_chrsm = my_randint(0, 1) #random.randint(0,1)
@@ -153,7 +153,7 @@ class Lineage:
                 positions.append(segment.b)
                 positions.sort()
                 for i in range(nb_recomb_in_seg + 1):
-                    next_segments.append(Segment(par_id, start_chrsm, positions[i], positions[i+1]))
+                    next_segments.append(Segment(par_id, start_chrsm, positions[i], positions[i+1]-1))
                     start_chrsm = abs(start_chrsm - 1)
             
         self.back_time += 1
