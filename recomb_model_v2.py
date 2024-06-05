@@ -110,6 +110,7 @@ class Lineage:
         self.has_separated = False
         self.first_common_anc = 0
         self.all_common_anc = 0
+        self.super_ghosts = []
 
 
     def backward_step(self):
@@ -161,12 +162,18 @@ class Lineage:
         
         self.cur_segments = next_segments
         
-        self.pop.individuals = {}   #clear pop
+        genealogical_ancestors = len(self.pop.individuals)
+        self.pop.individuals = next_pop.individuals   #clear pop
         #next pop has only indivs with a segment - you could argue they should not have been created in the first place...
-        for s in self.cur_segments:
-            if s.indiv_id not in self.pop.individuals:
-                self.pop.individuals[s.indiv_id] = next_pop.individuals[s.indiv_id]
-            
+        if self.all_common_anc != 0:
+            d = {}
+            for s in self.cur_segments:
+                if s.indiv_id not in d:
+                    d[s.indiv_id] = next_pop.individuals[s.indiv_id]
+            ghosts = genealogical_ancestors - len(d)
+            # print("we have", ghosts, "ghosts (", len(d), "/",genealogical_ancestors,")")
+            self.super_ghosts.append(ghosts)
+
         if self.all_common_anc == 0:
             min_nb_desc, max_nb_desc = self.pop.size, 0
             for indiv in self.pop.individuals.values():
@@ -269,7 +276,10 @@ class Lineage:
     def write_data(self,filename):
         d = {"nb_ancestors" : list(self.nb_ancestors),
              "nb_segments" : list(self.nb_segments),
-             "genetic_mat" : list(self.genetic_mat)}
+             "genetic_mat" : list(self.genetic_mat),
+             "super_ghosts": list(self.super_ghosts),
+             "first_commom_anc" : self.first_common_anc,
+             "all_common_anc" : self.all_common_anc}
         json_object = json.dumps(d)
         with open(filename, "w") as outfile:
             outfile.write(json_object)
