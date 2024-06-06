@@ -162,7 +162,6 @@ class Lineage:
         
         self.cur_segments = next_segments
         
-        genealogical_ancestors = len(self.pop.individuals)
         self.pop.individuals = next_pop.individuals   #clear pop
         #next pop has only indivs with a segment - you could argue they should not have been created in the first place...
         if self.all_common_anc != 0:
@@ -170,7 +169,7 @@ class Lineage:
             for s in self.cur_segments:
                 if s.indiv_id not in d:
                     d[s.indiv_id] = next_pop.individuals[s.indiv_id]
-            ghosts = genealogical_ancestors - len(d)
+            ghosts = len(next_pop.individuals) - len(d)
             # print("we have", ghosts, "ghosts (", len(d), "/",genealogical_ancestors,")")
             self.super_ghosts.append(ghosts)
 
