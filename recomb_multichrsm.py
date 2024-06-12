@@ -2,6 +2,7 @@ import numpy as np
 import random as random
 import json
 import os
+from execo_engine import slugify
 
 
 #apparently the fastest way to rand (faster would be to do them in batch)
@@ -11,28 +12,98 @@ def my_randint(m1, m2):
 
 
 
+class Simulation:
+    def __init__(self, dictionary):
+        ## default values
+        self.final_time = 1000       # Simulation length in generation 
+        self.chrsm_len = 10000       # "blocks" in *each* chromosome
+        self.recomb_rate = 1/10000   # probability to recombine between any 2 blocks
+        self.nb_chrsm = 1            # nb of *pairs* of chromosomes
+        self.pop_size = 1000         # nb of individuals (of 2*nb_chrsm chromosomes each)
+
+        self.seg_list = []           # additionnal parameter to get the segments to follow
+                                     # if empty, follow the whole population
+        self.verbose = False
+        self.write_data = True
+        self.filename = "test/"+slugify(dictionary)+".json"
+        self.seed = 34968374
+
+        ## override with given values
+        for k,v in dictionary.items():
+            setattr(self, k, v)
+            print(k,v)
+
+        ## prepare the random draws
+        np.random.seed(self.seed)
+        self.chrsm_choice_rd = np.random.randint(0, 2, self.nb_chrsm*self.pop_size)
+        self.expected_nb_recomb = int(self.pop_size*self.chrsm_len*self.recomb_rate*2*self.nb_chrsm)
+        self.recomb_counter = 0
+        self.recomb_pos_random = np.random.randint(1,
+                        self.chrsm_len,
+                        2*self.expected_nb_recomb)
+
+
+    def run(self):
+        pop = Population(self)
+        for i in range(self.pop_size):
+            pop.individuals[i] = Individual(self, i, None)
+            # We initialize the whole population anyway to follow the genealogy and get the
+            # genealogical ancestors
+        lin = Lineage(pop, self.seg_list)
+
+        while (lin.back_time < self.final_time-1):
+            if (self.verbose) & (lin.back_time%50==0):
+               print(f"T={lin.back_time}  S={sum(len(lc) for lc in lin.cur_segments)} "\
+                     f" Ngeneal={lin.nb_ind_genealogical_ancestors[-1]}  Ngeneti={lin.nb_ind_genetic_ancestors[-1]}"\
+                     f" Nb_bases={lin.genetic_mat[-1]}")
+
+            lin.backward_step()
+            lin.check_fused_segments()
+
+        if self.write_data:
+            lin.write_data(self.filename)
+
+
+
 class Individual:
-    def __init__(self, id, parent1, parent2, chrsm_len, recomb_rate, child=None, nb_chrsm=1):
+    def __init__(self, simulation, id, child=None):
         if child != None:
             self.final_desc = child.final_desc
-            self.nb_chrsm = child.nb_chrsm
         else:
             self.final_desc = [id]
-            self.nb_chrsm = nb_chrsm
 
+        nb_chrsm = simulation.nb_chrsm
         # In case of multi chromosomes, we assume they all have the same length and the same average
         # recomb_rate per chromosomes
-        nb_recombs = np.random.binomial(chrsm_len, recomb_rate, self.nb_chrsm)
+        nb_recombs = np.random.binomial(simulation.chrsm_len, simulation.recomb_rate, nb_chrsm)
+        nb_recombs2 = np.random.binomial(simulation.chrsm_len, simulation.recomb_rate, nb_chrsm)
+        if (simulation.recomb_counter + sum(nb_recombs) + sum(nb_recombs2)) >= len(simulation.recomb_pos_random):
+            simulation.recomb_pos_random = np.random.randint(1,
+                        self.simulation.chrsm_len,
+                        2*self.simulation.expected_nb_recomb)
+            simulation.recomb_counter = 0
+
+        start = simulation.recomb_counter
+        start2 = start + sum(nb_recombs)
         # Positions de recombinaisons
-        self.recomb_par1 = [np.random.choice(chrsm_len-1, nb_recombs[i], replace=False)+1
-                            for i in range(self.nb_chrsm)]
+        self.recomb_par1, self.recomb_par2 = [], []
+        for i in range(nb_chrsm):
+            self.recomb_par1 += [simulation.recomb_pos_random[start: start+nb_recombs[i]+1]]
+            start += nb_recombs[i]+1
+            self.recomb_par2 += [simulation.recomb_pos_random[start2: start2+nb_recombs2[i]+1]]
+            start2 += nb_recombs2[i]+1
 
-        nb_recombs = np.random.binomial(chrsm_len, recomb_rate, self.nb_chrsm)
-        self.recomb_par2 = [np.random.choice(chrsm_len-1, nb_recombs[i], replace=False)+1
-                            for i in range(self.nb_chrsm)]
+        # [np.random.choice(simulation.chrsm_len-1, nb_recombs[i], replace=False)+1
+        #                     for i in range(nb_chrsm)]
+        # self.simulation.recomb_counter = start2
 
-        self.par1_gave_chrsm = np.random.randint(0,2, self.nb_chrsm)
-        self.par2_gave_chrsm = np.random.randint(0,2, self.nb_chrsm)
+        # nb_recombs = np.random.binomial(simulation.chrsm_len, simulation.recomb_rate, self.nb_chrsm)
+        # self.recomb_par2 = [np.random.choice(simulation.chrsm_len-1, nb_recombs[i], replace=False)+1
+        #                     for i in range(nb_chrsm)]
+        # self.simulation.recomb_counter += sum(nb_recombs)
+
+        self.par1_gave_chrsm = simulation.chrsm_choice_rd[2*nb_chrsm*id : 2*nb_chrsm*id+nb_chrsm]
+        self.par2_gave_chrsm = simulation.chrsm_choice_rd[2*nb_chrsm*id+nb_chrsm : (2*nb_chrsm*id+nb_chrsm)+nb_chrsm]
 
         # Les chromosomes, après recombinaison, sont à "droite" ou à "gauche"
         #                  (gauche) 0  1 (droite)
@@ -45,42 +116,42 @@ class Individual:
         # au-dessus du point de coupure, et ce qui était à droite en-dessous du point
         # de coupure
 
-        if parent1 != None:
-            self.parent1_id = parent1.id
-            self.parent2_id = parent2.id
-
         self.id = id # position dans la population
 
 
 class Population:
-    def __init__(self, size, chrsm_len, recomb_rate, nb_chrsm):
-        self.size = size
+    def __init__(self, simulation):
+        self.simulation = simulation
         self.individuals = {}
-        for i in range(size):
-            self.individuals[i] = Individual(i, None, None, chrsm_len, recomb_rate, None, nb_chrsm)
-            # We initialize the whole population anyway to follow the genealogy and get the
-            # genealogical ancestors
-        self.chrsm_len = chrsm_len
-        self.r = recomb_rate
-        self.nb_chrsm = nb_chrsm
+        simulation.chrsm_choice_rd = np.random.randint(0,2, 2 * self.simulation.nb_chrsm * self.simulation.pop_size)
+
+
+
 
     #this is the previous forward_step, now it generates the parent indivs from the child indivs
     #side effect: child_pop indivs get parent1 and parent2 assigned
     def generate_from_child_population(self, child_pop, to_check):
+        self.simulation.chrsm_choice_rd = np.random.randint(0,2, 2 * self.simulation.nb_chrsm * self.simulation.pop_size)
+        par_ids = np.random.randint(0, self.simulation.pop_size, 2*self.simulation.pop_size)
+        self.simulation.recomb_pos_random = np.random.randint(1,
+                        self.simulation.chrsm_len,
+                        2*self.simulation.expected_nb_recomb)
+        self.simulation.recomb_counter = 0
 
-        for indiv in child_pop.individuals.values():
-            par1_id = my_randint(0,self.size-1)
-            par2_id = my_randint(0,self.size-1)
-            while par1_id == par2_id:
-                par2_id = my_randint(0, self.size-1)
+        for id, indiv in child_pop.individuals.items():
+            par1_id =  par_ids[2*id]
+            par2_id = par_ids[2*id+1]
+            # while par1_id == par2_id:
+            #     par2_id = my_randint(0, self.simulation.pop_size-1)
+                # pourquoi est-ce qu’on empêche le selfing ??
 
             if par1_id not in self.individuals:
-                self.individuals[par1_id] = Individual(par1_id, None, None, self.chrsm_len, self.r, indiv)
+                self.individuals[par1_id] = Individual(self.simulation, par1_id, indiv)
             elif to_check:
                 self.individuals[par1_id].final_desc[0:0] = indiv.final_desc
 
             if par2_id not in self.individuals:
-                self.individuals[par2_id] = Individual(par2_id, None, None, self.chrsm_len, self.r, indiv)
+                self.individuals[par2_id] = Individual(self.simulation, par2_id, indiv)
             elif to_check:
                 self.individuals[par2_id].final_desc[0:0] = indiv.final_desc
 
@@ -107,25 +178,25 @@ class Segment:
 
 
 class Lineage:
-    def __init__(self, initial_pop, seg_list=None):
+    def __init__(self, initial_pop, seg_list=[]):
         self.pop = initial_pop
         self.back_time = 0
 
-        if seg_list != None:
+        if seg_list != []:
             self.cur_segments = seg_list # [ Segment(indiv_id, chrsm, a, b)]
         else: # We follow the whole population
             self.cur_segments = []
-            for nc in range(self.pop.nb_chrsm):
+            for nc in range(self.pop.simulation.nb_chrsm):
                 self.cur_segments.append([])
-                for indiv_id in range(self.pop.size):
-                    self.cur_segments[nc].append(Segment(indiv_id, (nc,0), 0, self.pop.chrsm_len-1))
-                    self.cur_segments[nc].append(Segment(indiv_id, (nc,1), 0, self.pop.chrsm_len-1))
+                for indiv_id in range(self.pop.simulation.pop_size):
+                    self.cur_segments[nc].append(Segment(indiv_id, (nc,0), 0, self.pop.simulation.chrsm_len-1))
+                    self.cur_segments[nc].append(Segment(indiv_id, (nc,1), 0, self.pop.simulation.chrsm_len-1))
 
         self.nb_segments = [sum(len(seg_nc) for seg_nc in self.cur_segments)]
         anc_ind_list = []
         anc_chrsm_list = []
         nb_bases = 0
-        for nc in range(self.pop.nb_chrsm):
+        for nc in range(self.pop.simulation.nb_chrsm):
             for seg in self.cur_segments[nc]:
                 nb_bases += seg.b - seg.a +1
                 if not seg.indiv_id in anc_ind_list:
@@ -145,12 +216,12 @@ class Lineage:
 
     def backward_step(self):
         next_segments = []  #next going backwards in time
-        next_pop = Population(self.pop.size, self.pop.chrsm_len, self.pop.r, self.pop.nb_chrsm)
+        next_pop = Population(self.pop.simulation)
         next_pop.generate_from_child_population(self.pop, self.all_common_anc == 0)
         # next pop has only indivs with a descendant
 
         #at this point, each indiv in self.pop must has parent1_id and parent2_id set
-        for nc in range(self.pop.nb_chrsm):
+        for nc in range(self.pop.simulation.nb_chrsm):
             next_segments.append([])
             for segment in self.cur_segments[nc]:
                 if segment.chrsm[1] == 0: # chrsm A : from parent 1
@@ -194,7 +265,7 @@ class Lineage:
         self.pop.individuals = next_pop.individuals
 
         if self.all_common_anc == 0:
-            min_nb_desc, max_nb_desc = self.pop.size, 0
+            min_nb_desc, max_nb_desc = self.pop.simulation.pop_size, 0
             for indiv in self.pop.individuals.values():
                 indiv.final_desc = list(set(indiv.final_desc))
                 nb_desc = len(indiv.final_desc)
@@ -202,10 +273,10 @@ class Lineage:
                     min_nb_desc = nb_desc
                 if nb_desc > max_nb_desc:
                     max_nb_desc = nb_desc
-            if self.first_common_anc == 0 and max_nb_desc == self.pop.size:
+            if self.first_common_anc == 0 and max_nb_desc == self.pop.simulation.pop_size:
 #                print("Most recent common ancestor of the population at time ", self.back_time)
                 self.first_common_anc = self.back_time
-            if min_nb_desc == self.pop.size:
+            if min_nb_desc == self.pop.simulation.pop_size:
 #                print("All common ancestor of the population at time ", self.back_time)
                 self.all_common_anc = self.back_time
 #            print("min", min_nb_desc, "max", max_nb_desc)
@@ -218,7 +289,7 @@ class Lineage:
         anc_ind_list = []
         anc_chrsm_list = []
 
-        for nc in range(self.pop.nb_chrsm):
+        for nc in range(self.pop.simulation.nb_chrsm):
             self.cur_segments[nc].sort(key=lambda s: (s.indiv_id, s.chrsm, s.a, s.b))  # sorts in place
             tmp_segments.append([])
 
@@ -263,8 +334,8 @@ class Lineage:
         self.nb_ind_genealogical_ancestors.append(len(self.pop.individuals))
         self.genetic_mat.append(int(genetic_mat))
 
-        if genetic_mat < self.pop.chrsm_len:
-            print(self.back_time, "genetic mat is ", genetic_mat, "while chrsm len", self.pop.chrsm_len)
+        if genetic_mat < self.pop.simulation.chrsm_len:
+            print(self.back_time, "genetic mat is ", genetic_mat, "while chrsm len", self.pop.simulation.chrsm_len)
             for seg in self.cur_segments:
                 seg.print()   
     
