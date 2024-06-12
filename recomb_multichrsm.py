@@ -82,6 +82,7 @@ class Individual:
                         self.simulation.chrsm_len,
                         2*self.simulation.expected_nb_recomb)
             simulation.recomb_counter = 0
+        # TODO check whether we have several times the same positions (and remove or redraw)
 
         start = simulation.recomb_counter
         start2 = start + sum(nb_recombs)
