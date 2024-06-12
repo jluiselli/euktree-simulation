@@ -93,15 +93,6 @@ class Individual:
             self.recomb_par2 += [simulation.recomb_pos_random[start2: start2+nb_recombs2[i]+1]]
             start2 += nb_recombs2[i]+1
 
-        # [np.random.choice(simulation.chrsm_len-1, nb_recombs[i], replace=False)+1
-        #                     for i in range(nb_chrsm)]
-        # self.simulation.recomb_counter = start2
-
-        # nb_recombs = np.random.binomial(simulation.chrsm_len, simulation.recomb_rate, self.nb_chrsm)
-        # self.recomb_par2 = [np.random.choice(simulation.chrsm_len-1, nb_recombs[i], replace=False)+1
-        #                     for i in range(nb_chrsm)]
-        # self.simulation.recomb_counter += sum(nb_recombs)
-
         self.par1_gave_chrsm = simulation.chrsm_choice_rd[2*nb_chrsm*id : 2*nb_chrsm*id+nb_chrsm]
         self.par2_gave_chrsm = simulation.chrsm_choice_rd[2*nb_chrsm*id+nb_chrsm : (2*nb_chrsm*id+nb_chrsm)+nb_chrsm]
 
@@ -141,9 +132,7 @@ class Population:
         for id, indiv in child_pop.individuals.items():
             par1_id =  par_ids[2*id]
             par2_id = par_ids[2*id+1]
-            # while par1_id == par2_id:
-            #     par2_id = my_randint(0, self.simulation.pop_size-1)
-                # pourquoi est-ce qu’on empêche le selfing ??
+
 
             if par1_id not in self.individuals:
                 self.individuals[par1_id] = Individual(self.simulation, par1_id, indiv)
@@ -235,11 +224,9 @@ class Lineage:
 
                 if par_gave_chrsm == 0:
                     # Le parent a donné le chrsm de gauche après la recombinaison
-                    # start_chrsm = 0
                     start_chrsm = int((len([pos for pos in recomb_pos_list if pos <= segment.a]) % 2 ) == 1)
                 else:
                     # Le parent a donné le chrsm de droite après la recombinaison
-                    # start_chrsm = 1
                     start_chrsm = int((len([pos for pos in recomb_pos_list if pos <= segment.a]) % 2 ) == 0)
 
                 nb_recomb_in_seg = len([pos for pos in recomb_pos_list if (pos > segment.a and pos <= segment.b)])
