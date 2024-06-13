@@ -152,13 +152,6 @@ class Population:
 class Segment:
     __slots__ = 'indiv_id', 'chrsm', 'a', 'b'
     def __init__(self,id,chrsm,a,b):
-        # if chrsm == 0:
-        #     chrsm = (0,0)
-        # elif chrsm == 1:
-        #     chrsm = (0,1)
-        # elif type(chrsm) != tuple:
-        #     print("error in chrsm type, should be (chrsm number, 0 or 1) as we hav multiple chrsms")
-        #     exit(1)
         self.indiv_id = id
         self.chrsm = chrsm
         self.a = a
