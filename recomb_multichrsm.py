@@ -150,6 +150,7 @@ class Population:
 
 
 class Segment:
+    __slots__ = 'indiv_id', 'chrsm', 'a', 'b'
     def __init__(self,id,chrsm,a,b):
         if chrsm == 0:
             chrsm = (0,0)
