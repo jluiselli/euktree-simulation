@@ -54,7 +54,7 @@ class Simulation:
         while (lin.back_time < self.final_time-1):
             if (self.verbose) & (lin.back_time%50==0):
                print(f"T={lin.back_time}  S={sum(len(lc) for lc in lin.cur_segments)} "\
-                     f" Ngeneal={lin.nb_ind_genealogical_ancestors[-1]}  Ngeneti={lin.nb_ind_genetic_ancestors[-1]}"\
+                     f" Ngeneal={lin.nb_ind_genealogical_ancestors[lin.back_time]}  Ngeneti={lin.nb_ind_genetic_ancestors[lin.back_time]}"\
                      f" Nb_bases={lin.genetic_mat[-1]}")
 
             lin.backward_step()
@@ -152,13 +152,13 @@ class Population:
 class Segment:
     __slots__ = 'indiv_id', 'chrsm', 'a', 'b'
     def __init__(self,id,chrsm,a,b):
-        if chrsm == 0:
-            chrsm = (0,0)
-        elif chrsm == 1:
-            chrsm = (0,1)
-        elif type(chrsm) != tuple:
-            print("error in chrsm type, should be (chrsm number, 0 or 1) as we hav multiple chrsms")
-            exit(1)
+        # if chrsm == 0:
+        #     chrsm = (0,0)
+        # elif chrsm == 1:
+        #     chrsm = (0,1)
+        # elif type(chrsm) != tuple:
+        #     print("error in chrsm type, should be (chrsm number, 0 or 1) as we hav multiple chrsms")
+        #     exit(1)
         self.indiv_id = id
         self.chrsm = chrsm
         self.a = a
@@ -183,22 +183,25 @@ class Lineage:
                     self.cur_segments[nc].append(Segment(indiv_id, (nc,0), 0, self.pop.simulation.chrsm_len-1))
                     self.cur_segments[nc].append(Segment(indiv_id, (nc,1), 0, self.pop.simulation.chrsm_len-1))
 
-        self.nb_segments = [sum(len(seg_nc) for seg_nc in self.cur_segments)]
-        anc_ind_list = []
-        anc_chrsm_list = []
+        self.nb_segments = np.zeros(initial_pop.simulation.final_time)
+        self.nb_segments[0] = sum(len(seg_nc) for seg_nc in self.cur_segments)
+        anc_ind_list = set()
+        anc_chrsm_list = set()
         nb_bases = 0
         for nc in range(self.pop.simulation.nb_chrsm):
             for seg in self.cur_segments[nc]:
                 nb_bases += seg.b - seg.a +1
-                if not seg.indiv_id in anc_ind_list:
-                    anc_ind_list.append(seg.indiv_id)
-                if not (seg.indiv_id, seg.chrsm) in anc_chrsm_list:
-                    anc_chrsm_list.append((seg.indiv_id, seg.chrsm))
-        self.nb_ind_genetic_ancestors = [len(anc_ind_list)]
-        self.nb_ind_genealogical_ancestors = [len(anc_ind_list)]
-        self.nb_chr_genetic_ancestors = [len(anc_chrsm_list)]
+                anc_ind_list.add(seg.indiv_id)
+                anc_chrsm_list.add((seg.indiv_id, seg.chrsm))
+        self.nb_ind_genetic_ancestors =  np.zeros(initial_pop.simulation.final_time)
+        self.nb_ind_genetic_ancestors[0] = len(anc_ind_list)
+        self.nb_ind_genealogical_ancestors = np.zeros(initial_pop.simulation.final_time)
+        self.nb_ind_genealogical_ancestors[0] = len(anc_ind_list)
+        self.nb_chr_genetic_ancestors = np.zeros(initial_pop.simulation.final_time)
+        self.nb_chr_genetic_ancestors[0] = len(anc_chrsm_list)
 
-        self.genetic_mat = [nb_bases]
+        self.genetic_mat = np.zeros(initial_pop.simulation.final_time)
+        self.genetic_mat[0] = nb_bases
 
         self.has_separated = False
         self.first_common_anc = 0
@@ -275,8 +278,8 @@ class Lineage:
     def check_fused_segments(self):
         tmp_segments = []
         genetic_mat = 0
-        anc_ind_list = []
-        anc_chrsm_list = []
+        anc_ind_list = set()
+        anc_chrsm_list = set()
 
         for nc in range(self.pop.simulation.nb_chrsm):
             self.cur_segments[nc].sort(key=lambda s: (s.indiv_id, s.chrsm, s.a, s.b))  # sorts in place
@@ -300,15 +303,13 @@ class Lineage:
                 if i not in indices_to_delete:
                     tmp_segments[nc].append(self.cur_segments[nc][i])
                     genetic_mat += self.cur_segments[nc][i].b-self.cur_segments[nc][i].a+1
-                    if not self.cur_segments[nc][i].indiv_id in anc_ind_list:
-                        anc_ind_list.append(self.cur_segments[nc][i].indiv_id)
-                    if not (self.cur_segments[nc][i].indiv_id, self.cur_segments[nc][i].chrsm) in anc_chrsm_list:
-                        anc_chrsm_list.append((self.cur_segments[nc][i].indiv_id, self.cur_segments[nc][i].chrsm))
-        self.nb_ind_genetic_ancestors.append(len(anc_ind_list))
-        self.nb_chr_genetic_ancestors.append(len(anc_chrsm_list))
+                    anc_ind_list.add(self.cur_segments[nc][i].indiv_id)
+                    anc_chrsm_list.add((self.cur_segments[nc][i].indiv_id, self.cur_segments[nc][i].chrsm))
+        self.nb_ind_genetic_ancestors[self.back_time] = len(anc_ind_list)
+        self.nb_chr_genetic_ancestors[self.back_time] = len(anc_chrsm_list)
 
 
-        if genetic_mat > self.genetic_mat[-1]:
+        if genetic_mat > self.genetic_mat[self.back_time-1]:
             print(self.back_time, "we increased the genetic material we follow !", genetic_mat, self.genetic_mat)
             print("future segs")
             for nc in range(self.pop.simulation.nb_chrsm):
@@ -320,9 +321,9 @@ class Lineage:
 
         self.cur_segments = tmp_segments
 
-        self.nb_segments.append(sum(len(segnc) for segnc in self.cur_segments))
-        self.nb_ind_genealogical_ancestors.append(len(self.pop.individuals))
-        self.genetic_mat.append(int(genetic_mat))
+        self.nb_segments[self.back_time] = sum(len(segnc) for segnc in self.cur_segments)
+        self.nb_ind_genealogical_ancestors[self.back_time] = len(self.pop.individuals)
+        self.genetic_mat[self.back_time] = int(genetic_mat)
 
         if genetic_mat < self.pop.simulation.chrsm_len:
             print(self.back_time, "genetic mat is ", genetic_mat, "while chrsm len", self.pop.simulation.chrsm_len)
