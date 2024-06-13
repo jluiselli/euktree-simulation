@@ -220,12 +220,23 @@ class Lineage:
                     par_id =  self.pop.individuals[segment.indiv_id].parent2_id
                     recomb_pos_list =  self.pop.individuals[segment.indiv_id].recomb_par2[nc]
 
+                recomb_pos_list.sort()
+                nb_recomb_before_a, nb_recomb_in_seg = 0,0
+                for pos in recomb_pos_list:
+                    if pos <= segment.a:
+                        nb_recomb_before_a += 1
+                    elif pos <= segment.b:
+                        nb_recomb_in_seg += 1
+                    else:
+                        break
+
+
                 if par_gave_chrsm == 0:
                     # Le parent a donné le chrsm de gauche après la recombinaison
-                    start_chrsm = int((len([pos for pos in recomb_pos_list if pos <= segment.a]) % 2 ) == 1)
+                    start_chrsm = (nb_recomb_before_a % 2) == 1
                 else:
                     # Le parent a donné le chrsm de droite après la recombinaison
-                    start_chrsm = int((len([pos for pos in recomb_pos_list if pos <= segment.a]) % 2 ) == 0)
+                    start_chrsm = (nb_recomb_before_a % 2) == 0
 
                 nb_recomb_in_seg = len([pos for pos in recomb_pos_list if (pos > segment.a and pos <= segment.b)])
                 if nb_recomb_in_seg == 0:
@@ -234,11 +245,8 @@ class Lineage:
                     next_segments[nc].append(Segment(par_id, (nc, start_chrsm), segment.a, segment.b))
                 else: # le segment est coup en x morceaux
                     self.has_separated = True
-                    positions = [segment.a]
-                    for pos in [pos for pos in recomb_pos_list if (pos > segment.a and pos <= segment.b)]:
-                        positions.append(pos)
-                    positions.append(segment.b+1)
-                    positions.sort()
+                    positions = [segment.a] + list(recomb_pos_list[nb_recomb_before_a:nb_recomb_before_a+nb_recomb_in_seg]) + [segment.b+1]
+
                     for i in range(nb_recomb_in_seg + 1):
                         if positions[i+1] < positions[i]:
                             print(par_id, nb_recomb_in_seg ,start_chrsm, positions, int((len([pos for pos in recomb_pos_list if pos <= segment.a]) % 2 ) == 1) )
