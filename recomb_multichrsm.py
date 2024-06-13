@@ -311,11 +311,12 @@ class Lineage:
         if genetic_mat > self.genetic_mat[-1]:
             print(self.back_time, "we increased the genetic material we follow !", genetic_mat, self.genetic_mat)
             print("future segs")
-            for seg in tmp_segments:
-                seg.print()
-            print("last segs")
-            for seg in self.cur_segments:
-                seg.print()
+            for nc in range(self.pop.simulation.nb_chrsm):
+                for seg in tmp_segments[nc]:
+                    seg.print()
+                print("last segs")
+                for seg in self.cur_segments[nc]:
+                    seg.print()
 
         self.cur_segments = tmp_segments
 
