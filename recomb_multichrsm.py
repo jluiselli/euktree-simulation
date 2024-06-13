@@ -234,7 +234,7 @@ class Lineage:
                 if nb_recomb_in_seg == 0:
                     # Pas de coupure du segment suivi
                     # le chromosome où on l’envoie dépend seulement du nombre de coupures *avant*
-                    next_segments[nc].append(Segment(par_id, start_chrsm, segment.a, segment.b))
+                    next_segments[nc].append(Segment(par_id, (nc, start_chrsm), segment.a, segment.b))
                 else: # le segment est coup en x morceaux
                     self.has_separated = True
                     positions = [segment.a]
@@ -245,7 +245,7 @@ class Lineage:
                     for i in range(nb_recomb_in_seg + 1):
                         if positions[i+1] < positions[i]:
                             print(par_id, nb_recomb_in_seg ,start_chrsm, positions, int((len([pos for pos in recomb_pos_list if pos <= segment.a]) % 2 ) == 1) )
-                        next_segments[nc].append(Segment(par_id, start_chrsm, positions[i], positions[i+1]-1))
+                        next_segments[nc].append(Segment(par_id, (nc, start_chrsm), positions[i], positions[i+1]-1))
                         start_chrsm = abs(start_chrsm - 1)
 
         self.back_time += 1
