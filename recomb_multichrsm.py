@@ -55,7 +55,7 @@ class Simulation:
             if (self.verbose) & (lin.back_time%50==0):
                print(f"T={lin.back_time}  S={sum(len(lc) for lc in lin.cur_segments)} "\
                      f" Ngeneal={lin.nb_ind_genealogical_ancestors[lin.back_time]}  Ngeneti={lin.nb_ind_genetic_ancestors[lin.back_time]}"\
-                     f" Nb_bases={lin.genetic_mat[-1]}")
+                     f" Nb_bases={lin.genetic_mat[lin.back_time]}")
 
             lin.backward_step()
             lin.check_fused_segments()
