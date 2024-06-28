@@ -1,0 +1,311 @@
+#include <iostream>
+#include <vector>
+#include <random>
+#include <algorithm>
+#include <array>
+
+
+#include <stdint.h>
+
+#include "rando_xo.hpp"
+#include "rando_mp.hpp"
+
+
+
+
+
+
+
+
+#ifdef USETBB
+	#include <execution>
+#endif
+
+using namespace std;
+
+
+//used to compile with 
+//g++ -O3 cyth.cpp -march=native -I/usr/include/tbb -lpthread -ltbb -DUSETBB
+//Need oneapi for fast sorting
+/*
+sudo apt install intel-basekit
+*/
+
+
+/**
+Note: we use uint32_t all over the place - make sure we never overflow.
+**/
+
+
+
+
+
+
+
+
+
+//TODO: storing all parameters globally is an anti-pattern, no one should ever do that
+namespace config{
+    uint32_t nbchr = 36;
+    uint32_t chrlen = 500000;
+    uint32_t nb_gen = 1000;
+    uint32_t pop_size = 100000;
+    double recomb_rate = 1/((double)chrlen);	
+}
+
+
+
+
+
+
+
+
+
+struct Segment{
+        uint32_t a;
+        uint32_t b;
+        uint32_t individ;
+        uint32_t chrno;
+        uint32_t chrindex;
+        
+        Segment() : Segment(0, 0, 0, 0, 0){
+        
+        }
+        
+        Segment(uint32_t individ, uint32_t chrno, uint32_t chrindex, uint32_t a, uint32_t b) : individ(individ), chrno(chrno), chrindex(chrindex), a(a), b(b){
+        	
+        }
+        
+        
+        
+        inline void setAttr(uint32_t individ, uint32_t chrno, uint32_t chrindex, uint32_t a, uint32_t b){
+        	this->individ = individ;
+        	this->chrno = chrno;
+        	this->chrindex = chrindex;
+        	this->a = a;
+        	this->b = b;
+        }
+        
+        
+        
+        // Overloading < operator for sorting purposes
+	bool operator<(const Segment& s) const
+	{ 
+
+		return std::tie( individ, chrno, chrindex, a, b ) < std::tie( s.individ, s.chrno, s.chrindex, s.a, s.b ); 
+	} 
+        
+        
+};
+
+
+
+
+
+
+class SegmentList{
+public:
+	size_t size;
+	vector<Segment> segments;
+
+
+
+	void init(size_t init_size){
+		segments.resize(init_size);
+		size = 0;
+		cout<<"resize init done"<<endl;
+	}
+	
+	
+	inline void add(uint32_t individ, uint32_t chrno, uint32_t chrindex, uint32_t a, uint32_t b){
+
+		if (size + 1 >= segments.size()){
+			cout<<"resizing to "<<segments.size()*2<<endl;
+			segments.resize( segments.size() * 2 );
+
+		}
+		
+		set(size, individ, chrno, chrindex, a, b);
+		
+		
+		size++;
+	}
+	
+
+	void set(size_t i, uint32_t individ, uint32_t chrno, uint32_t chrindex, uint32_t a, uint32_t b){
+		segments[i].setAttr(individ, chrno, chrindex, a, b);
+	}
+	
+	
+	inline Segment& get(size_t i){
+		return segments[i];
+	}
+	
+	
+	void resize(size_t newsize){
+		size = newsize;
+	}
+	
+	
+	void sort(){
+		#ifdef USETBB
+			std::sort(std::execution::par, segments.begin(), segments.begin() + size);
+
+			//__gnu_parallel::sort(segments.begin(), segments.begin() + size);
+		#else
+			std::sort(segments.begin(), segments.begin() + size);
+		#endif
+	}
+};
+
+
+
+
+
+
+
+
+
+
+class Population{
+public:
+	vector<uint32_t> par_ids; 	
+	vector<uint32_t> chr_choices;
+	vector<uint32_t> members;	//list of individuals.  members[i] = 1 => is a genealogical ancestor, and 0 otherwise
+	
+	vector<uint32_t> chr_nb_breakpoints;
+	
+	Population(){
+		par_ids.resize( 2 * config::pop_size );		//two parents per indiv
+		chr_choices.resize( 2 * config::nbchr * config::pop_size ); 	//0 or 1 for each chr
+		members.resize( config::pop_size );		
+		chr_nb_breakpoints.resize( 2 * config::nbchr * config::pop_size );
+	}
+};
+
+
+
+
+
+
+
+
+void generate_population(Population &prev_pop, Population &pop_to_fill, uint32_t nbchr) {
+
+    //chooses two parents for each member of prev_pop
+    rando_mp::generate_random_integers(prev_pop.par_ids, config::pop_size, 2 * config::pop_size);
+
+    //chooses the recombined chromosome obtained from each parent (0 = first chr, 1 = second chr)
+    rando_mp::generate_random_integers(pop_to_fill.chr_choices, 2, 2 * config::nbchr * config::pop_size);
+
+
+    //chooses the number of breakpoints for each chromosome
+    rando_mp::generate_binomials( prev_pop.chr_nb_breakpoints, config::chrlen, config::recomb_rate, 2 * config::nbchr * config::pop_size );
+
+    
+    std::fill(pop_to_fill.members.begin(), pop_to_fill.members.end(), 0);
+
+    for (uint32_t i = 0; i < config::pop_size; ++i) {
+        if (prev_pop.members[i] != 0) {
+            pop_to_fill.members[prev_pop.par_ids[2 * i]] = 1;
+            pop_to_fill.members[prev_pop.par_ids[2 * i + 1]] = 1;
+        }
+    }
+
+}
+
+int main() {
+
+    
+    vector<int*> v;
+    
+    for (size_t u = 0; u < 1000; ++u){
+    v.resize(10000000);
+    std::sort(std::execution::par, v.begin(), v.end());
+    cout<<"u="<<u<<endl;
+    }
+    
+
+
+
+
+
+
+
+
+    
+    rando_xo::init(1,2,3,4);
+    rando_mp::init(22222223, 1, 2, 3, 4);
+
+    #ifdef USETBB
+    	cout<<"Using TBB for sorting"<<endl;
+    #endif
+
+    
+    
+    //we maintain two Population objects: the current and the previous.  Their memory can be reused.
+    //we make them pointers so that we can easily swap them without accidental copies
+    Population* curpop = new Population();
+    std::fill(curpop->members.begin(), curpop->members.end(), 1);
+    
+    Population* prevpop = new Population();
+    
+    
+    //we also maintain two segment lists, again to reuse their meomory
+    SegmentList* cur_seglist = new SegmentList();
+    cur_seglist->init( config::pop_size * config::nbchr * 2 );	//reserve enough space for several segments per chr
+    
+    SegmentList* prev_seglist = new SegmentList();
+    prev_seglist->init( config::pop_size * config::nbchr * 2 );	//reserve enough space for several segments per chr
+    
+    for (size_t i = 0; i < config::pop_size; ++i){
+    	for (size_t c = 0; c < config::nbchr; ++c){
+    		cur_seglist->add( i, c, 0, 0, config::chrlen -1 );    
+    		cur_seglist->add( i, c, 0, 0, config::chrlen -1 );
+    	}
+    }
+    
+    cout<<"Starting simulation"<<endl;
+
+
+    for (uint32_t g = 0; g < config::nb_gen; ++g) {
+
+
+	generate_population(*curpop, *prevpop, config::nbchr);
+
+	Population* tmppop = curpop;
+	curpop = prevpop;
+	prevpop = tmppop;
+	
+
+	prev_seglist->resize(0);
+	for (size_t s = 0; s < cur_seglist->size; ++s){
+		Segment seg = cur_seglist->get(s);
+		prev_seglist->add( seg.individ, seg.chrno, seg.chrindex, seg.a, seg.b );
+	}
+	SegmentList* tmpseglist = cur_seglist;
+	cur_seglist = prev_seglist;
+	prev_seglist = tmpseglist;
+	
+	cur_seglist->sort();
+	
+
+        if (g % 10 == 0) {
+            uint32_t npop = accumulate(curpop->members.begin(), curpop->members.end(), 0);
+            cout << "g=" << g << "   npop=" << npop << endl;
+        }
+    }
+    
+    
+    delete curpop;
+    delete prevpop;
+    delete cur_seglist;
+    delete prev_seglist;
+
+    return 0;
+}
+
+
+
+
+

@@ -1,0 +1,25 @@
+To compile and run:
+cd build
+cmake ..
+make
+./simchr
+
+
+REQUIRES
+openmp	to parallelize some loops
+p2rng (https://github.com/arminms/p2rng.git) for fast rng
+
+
+TODO
+The parameters for a run are currently hardcoded in a namespace
+namespace config{
+    uint32_t nbchr = 36;
+    uint32_t chrlen = 500000;
+    uint32_t nb_gen = 1000;
+    uint32_t pop_size = 2000;
+    double recomb_rate = 1/((double)chrlen);	
+}
+
+It remains to set those through a command line arugment.
+
+Also todo, generating binomials is slow, even with p2rng. 
