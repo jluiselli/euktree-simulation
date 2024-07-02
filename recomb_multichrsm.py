@@ -90,12 +90,11 @@ class Individual:
         self.recomb_par1, self.recomb_par2 = [], []
         for i in range(nb_chrsm):
             self.recomb_par1 += [simulation.recomb_pos_random[start: start+nb_recombs[i]]]
-            start += nb_recombs[i]+1
-            start2 += nb_recombs2[i]+1
             self.recomb_par2 += [simulation.recomb_pos_random[start2: start2+nb_recombs2[i]]]
 
         self.par1_gave_chrsm = simulation.chrsm_choice_rd[2*nb_chrsm*id : 2*nb_chrsm*id+nb_chrsm]
         self.par2_gave_chrsm = simulation.chrsm_choice_rd[2*nb_chrsm*id+nb_chrsm : (2*nb_chrsm*id+nb_chrsm)+nb_chrsm]
+        simulation.recomb_counter += sum(nb_recombs) + sum(nb_recombs2)
 
         # Les chromosomes, après recombinaison, sont à "droite" ou à "gauche"
         #                  (gauche) 0  1 (droite)
