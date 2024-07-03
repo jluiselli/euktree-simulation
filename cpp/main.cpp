@@ -825,8 +825,10 @@ int main(int argc, char* argv[]) {
 		    cout << "g=" << g << "   npop=" << npop << "   nbseg="<<nbsegments<<"   nbbases="<<segsizes<<endl;
 		}
 	}
-	lineage.write_data("test.csv", config::nb_gen);
-
+	stringstream filename;
+	filename << "nbchr-"<<config::nbchr<<"-chrlen-"<<config::chrlen<<"-nb_gen-"<<config::nb_gen
+	<<"-pop_size-"<<config::pop_size<<"-recomb_rate-"<<config::recomb_rate<<"-seed-"<<config::seed<<".csv";
+	lineage.write_data(filename.str(), config::nb_gen);
 
 	return 0;
 }
