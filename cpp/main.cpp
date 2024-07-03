@@ -812,9 +812,9 @@ int main(int argc, char* argv[]) {
 		lineage.backstep();
 
 		if (g % 10 == 0) {
-		    size_t nbsegments = lineage.cur_seglist->get_total_nb_segments();
-		    size_t segsizes = lineage.cur_seglist->get_total_segment_size();
-		    uint32_t npop = accumulate(lineage.cur_pop->members.begin(), lineage.cur_pop->members.end(), 0);
+			size_t nbsegments = lineage.nb_segments.back();
+			size_t segsizes = lineage.nb_bases.back();
+			size_t npop = lineage.nb_ind_genealogical_ancestors.back();
 		    cout << "g=" << g << "   npop=" << npop << "   nbseg="<<nbsegments<<"   nbbases="<<segsizes<<endl;
 		}
 	}
