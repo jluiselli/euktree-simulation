@@ -55,6 +55,7 @@ namespace config{
     uint32_t nb_gen = 1000;
     uint32_t pop_size = 2000;
     double recomb_rate = 1/((double)chrlen);	
+	uint32_t seed = 432498743;
 }
 
 
@@ -731,21 +732,22 @@ public:
 
 void print_help(){
 	std::cout<<"Command line usage:\n"
-	<<"./simchr -c nb_of_chrsm -l chrsm_len -g nb_generations -p population_size -r recombination_rate\n"
+	<<"./simchr -c nb_of_chrsm -l chrsm_len -g nb_generations -p population_size -r recombination_rate -s seed_for_prng\n"
 	<<"or \n"
-	<<"./simchr --nbchr nb_of_chrsm --chrlen chrsm_len --nb_gen nb_generations --pop_size population_size --recomb_rate recombination_rate\n"
+	<<"./simchr --nbchr nb_of_chrsm --chrlen chrsm_len --nb_gen nb_generations --pop_size population_size --recomb_rate recombination_rate --seed seed_for_prng\n"
 	<<"or any combination of short/long name ! No parameter is mandatory. In absence of specifications, default values are:\n"
 	<<" nbchr : "<<config::nbchr<<"\n"
 	<<" chrlen : "<<config::chrlen<<"\n"
 	<<" nb_gen : "<<config::nb_gen<<"\n"
 	<<" pop_size : "<<config::pop_size<<"\n"
-	<<" recomb_rate : "<<config::recomb_rate<<"\n";
+	<<" recomb_rate : "<<config::recomb_rate<<"\n"
+	<<" seed : "<<config::seed<<"\n";
 }
 
 
 void interpret_cmd_line_options(int argc, char* argv[]) {
   // Define allowed options
-  const char * options_list = "hc:l:g:p:r:";
+  const char * options_list = "hc:l:g:p:r:s:";
   static struct option long_options_list[] = {
       {"help",      no_argument,        nullptr, 'h'},
       {"nbchr",     required_argument,  nullptr, 'c'},
@@ -753,6 +755,7 @@ void interpret_cmd_line_options(int argc, char* argv[]) {
       {"nb_gen",    required_argument,  nullptr, 'g'},
       {"pop_size",  required_argument,  nullptr, 'p'},
 	  {"recomb_rate",  required_argument,  nullptr, 'r'},
+	  {"seed",      required_argument,  nullptr, 's'},
 	//   {"recomb_nb",  no_argument,  nullptr, 'R'},
   };
 
@@ -785,6 +788,10 @@ void interpret_cmd_line_options(int argc, char* argv[]) {
         config::recomb_rate = atof(optarg);
         break;
       }
+	  case 's' : {
+        config::seed = atol(optarg);
+        break;
+      }
     }
   }
 }
@@ -799,7 +806,7 @@ int main(int argc, char* argv[]) {
 	rando_xo needs four uint32_t for seeds, but it is set by rando_mp, so it is pointless to call it.
 	*/
 	//rando_xo::init(11,22,33,44);
-	rando_mp::init(12222223, 11, 22, 33, 44);
+	rando_mp::init(config::seed, 11, 22, 33, 44);
 
 	interpret_cmd_line_options(argc, argv);
 
