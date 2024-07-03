@@ -8,6 +8,7 @@
 #include <set>
 
 #include <stdint.h>
+#include <getopt.h>
 
 #include "rando_xo.hpp"
 #include "rando_mp.hpp"
@@ -721,14 +722,61 @@ public:
 };
 
 
+void print_help(){
+	std::cout<<"Command line usage:\n"
+	<<"./simchr -c nb_of_chrsm -l chrsm_len -g nb_generations -p population_size -r recombination_rate\n";
+}
+
+
+void interpret_cmd_line_options(int argc, char* argv[]) {
+  // Define allowed options
+  const char * options_list = "hc:l:g:p:r:";
+  static struct option long_options_list[] = {
+      {"help",      no_argument,        nullptr, 'h'},
+      {"nbchr",     required_argument,  nullptr, 'c'},
+      {"chrlen",    required_argument,  nullptr, 'l'},
+      {"nb_gen",    required_argument,  nullptr, 'g'},
+      {"pop_size",  required_argument,  nullptr, 'p'},
+	  {"recomb_rate",  required_argument,  nullptr, 'r'},
+	//   {"recomb_nb",  no_argument,  nullptr, 'R'},
+  };
+
+  // Get actual values of the command-line options
+  int option;
+  while ((option = getopt_long(argc, argv, options_list,
+                               long_options_list, nullptr)) != -1) {
+    switch (option) {
+      case 'h' : {
+        print_help();
+        exit(EXIT_SUCCESS);
+      }
+      case 'c' : {
+        config::nbchr = atol(optarg);
+		break;
+      }
+      case 'l' : {
+        config::chrlen = atol(optarg);
+        break;
+      }
+      case 'g' : {
+        config::nb_gen = atol(optarg);
+        break;
+      }
+	  case 'p' : {
+        config::pop_size = atol(optarg);
+        break;
+      }
+      case 'r' : {
+        config::recomb_rate = atof(optarg);
+        break;
+      }
+    }
+  }
+}
 
 
 
-
-
-
-
-int main() {
+int main(int argc, char* argv[]) {
 
 	/*
 	these set the seed for the randomizers
@@ -737,6 +785,8 @@ int main() {
 	*/
 	//rando_xo::init(11,22,33,44);
 	rando_mp::init(12222223, 11, 22, 33, 44);
+
+	interpret_cmd_line_options(argc, argv);
 
 	Lineage lineage;
 	cout<<"Starting simulation   s="<<lineage.cur_seglist->get_total_nb_segments()<<"   nbases="<<lineage.cur_seglist->get_total_segment_size()<<endl;
