@@ -724,7 +724,15 @@ public:
 
 void print_help(){
 	std::cout<<"Command line usage:\n"
-	<<"./simchr -c nb_of_chrsm -l chrsm_len -g nb_generations -p population_size -r recombination_rate\n";
+	<<"./simchr -c nb_of_chrsm -l chrsm_len -g nb_generations -p population_size -r recombination_rate\n"
+	<<"or \n"
+	<<"./simchr --nbchr nb_of_chrsm --chrlen chrsm_len --nb_gen nb_generations --pop_size population_size --recomb_rate recombination_rate\n"
+	<<"or any combination of short/long name ! No parameter is mandatory. In absence of specifications, default values are:\n"
+	<<" nbchr : "<<config::nbchr<<"\n"
+	<<" chrlen : "<<config::chrlen<<"\n"
+	<<" nb_gen : "<<config::nb_gen<<"\n"
+	<<" pop_size : "<<config::pop_size<<"\n"
+	<<" recomb_rate : "<<config::recomb_rate<<"\n";
 }
 
 
