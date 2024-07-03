@@ -397,6 +397,7 @@ public:
 	SegmentList* temp_seglist;
 
 	//data we want to store and export in the end
+	vector<uint32_t> nb_ind_genealogical_ancestors;
 	vector<uint32_t> nb_ind_genetic_ancestors;
 	vector<uint32_t> nb_chr_genetic_ancestors;
 	vector<uint32_t> nb_segments;
@@ -431,6 +432,7 @@ public:
 
 		// data storage TODO : if we have the information of number of generations, 
 		// we could set sizes and prevent further resizing of vectors ? 
+		nb_ind_genealogical_ancestors.push_back(config::pop_size);
 		nb_ind_genetic_ancestors.push_back(config::pop_size);
 		nb_chr_genetic_ancestors.push_back(config::pop_size * config::nbchr * 2);
 		nb_segments.push_back(config::pop_size * config::nbchr * 2);
@@ -457,10 +459,10 @@ public:
 
 	void write_data(string filename, uint32_t finaltime){
 		std::ofstream data(filename);
-		data<<"backtime,nb_ind_genetic_ancestors,nb_chr_genetic_ancestors";
+		data<<"backtime,nb_ind_genealogical_ancestors,nb_ind_genetic_ancestors,nb_chr_genetic_ancestors";
 		data<<",nb_segments,nb_fusions,nb_bases"<<std::endl;
 		for (uint32_t t = 0; t < finaltime; t++){
-			data<<t<<","<<nb_ind_genetic_ancestors[t]<<","<<nb_chr_genetic_ancestors[t]<<",";
+			data<<t<<","<<nb_ind_genealogical_ancestors[t]<<","<<nb_ind_genetic_ancestors[t]<<","<<nb_chr_genetic_ancestors[t]<<",";
 			data<<nb_segments[t]<<","<<nb_fusions[t]<<","<<nb_bases[t]<<'\n';
 		}
 		data.close();
@@ -518,6 +520,7 @@ public:
 		nb_ind_genetic_ancestors.emplace_back(tmp_nb_ind_genetic_anc);
 		nb_chr_genetic_ancestors.emplace_back(tmp_nb_chr_genetic_anc);
 		nb_bases.emplace_back(tmp_nb_bases);
+		nb_ind_genealogical_ancestors.emplace_back(accumulate(pop.members.begin(), pop.members.end(), 0));
 	}
 	
 	
