@@ -560,9 +560,6 @@ public:
 		prev_seglist.sort();
 		next_seglist.reset_sizes();
 		
-		set<uint32_t> indivs; 
-				
-		
 		//Since prev_seglist is split into chromosomes, we iterate over each chromosome and handle the segments on it.  Recall that 
 		//prev_seglist stores segments on that chromosome for all indivs - we sort the lists by individual, and handle all segments on that indiv in a single loop.
 		//When we encouter a new indiv, a new loop starts.
