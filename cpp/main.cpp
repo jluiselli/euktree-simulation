@@ -1,4 +1,5 @@
 #include <iostream>
+#include <fstream>
 #include <vector>
 #include <random>
 
@@ -394,6 +395,20 @@ public:
 	SegmentList* cur_seglist;
 	SegmentList* temp_seglist;
 
+	//data we want to store and export in the end
+	vector<uint32_t> nb_ind_genetic_ancestors;
+	vector<uint32_t> nb_chr_genetic_ancestors;
+	vector<uint32_t> nb_segments;
+	vector<uint32_t> nb_fusions;
+	vector<uint32_t> nb_bases;
+	uint32_t first_common_anc;
+
+	// to use at each generation
+	uint32_t tmp_nb_segments;
+	uint32_t tmp_nb_ind_genetic_anc;
+	uint32_t tmp_nb_chr_genetic_anc;
+	uint32_t tmp_nb_fusions;
+	uint32_t tmp_nb_bases;
 
 	Lineage(){
 		
@@ -412,6 +427,22 @@ public:
 				cur_seglist->add( i, c, 1, 0, config::chrlen -1 );
 			}
 		}
+
+		// data storage TODO : if we have the information of number of generations, 
+		// we could set sizes and prevent further resizing of vectors ? 
+		nb_ind_genetic_ancestors.push_back(config::pop_size);
+		nb_chr_genetic_ancestors.push_back(config::pop_size * config::nbchr * 2);
+		nb_segments.push_back(config::pop_size * config::nbchr * 2);
+		// ^ hard-coded that we take the whole population to start with
+		nb_fusions.push_back(0);
+		nb_bases.push_back(config::pop_size * config::nbchr * 2 * config::chrlen);
+
+		// To use at each generation
+		tmp_nb_segments = 0;
+		tmp_nb_ind_genetic_anc = 0;
+		tmp_nb_chr_genetic_anc = 0;
+		tmp_nb_fusions = 0;
+		tmp_nb_bases = 0;
 	}
 	
 	
@@ -422,8 +453,17 @@ public:
 		delete temp_seglist;
 	}
 	
-	
-	
+
+	void write_data(string filename, uint32_t finaltime){
+		std::ofstream data(filename);
+		data<<"backtime,nb_ind_genetic_ancestors,nb_chr_genetic_ancestors";
+		data<<",nb_segments,nb_fusions,nb_bases"<<std::endl;
+		for (uint32_t t = 0; t < finaltime; t++){
+			data<<t<<","<<nb_ind_genetic_ancestors[t]<<","<<nb_chr_genetic_ancestors[t]<<",";
+			data<<nb_segments[t]<<","<<nb_fusions[t]<<","<<nb_bases[t]<<'\n';
+		}
+		data.close();
+	}
 	
 
 	void backstep(){
@@ -444,9 +484,32 @@ public:
 		cur_seglist = temp_seglist;
 		temp_seglist = even_more_temporary_seglist;
 		
-		
+		tmp_nb_fusions = 0;
 		Lineage::check_fused_segments(*cur_seglist);
-		
+
+	//TODO ajouter le calcul des stats à la volée au lieu de reparcourir la liste une fois de plus à la fin
+		tmp_nb_bases = 0;
+		tmp_nb_segments = 0;
+		std::set<int> ind_ids;
+		std::set<int> chrsm_ids;
+
+		for (uint32_t i = 0; i < 2*config::nbchr; i++){
+			tmp_nb_segments += cur_seglist->sizes[i];
+			for (uint32_t size = 0; size <  cur_seglist->sizes[i]; size++){
+				Segment seg = cur_seglist->segments[i][size];
+				ind_ids.insert(seg.individ);
+				chrsm_ids.insert(2*config::nbchr*seg.individ + 2*seg.chrno + seg.chrindex);
+				tmp_nb_bases += seg.b - seg.a + 1;
+			}
+		}
+		tmp_nb_ind_genetic_anc = ind_ids.size();
+		tmp_nb_chr_genetic_anc = chrsm_ids.size();
+
+		nb_fusions.emplace_back(tmp_nb_fusions);
+		nb_segments.emplace_back(tmp_nb_segments);
+		nb_ind_genetic_ancestors.emplace_back(tmp_nb_ind_genetic_anc);
+		nb_chr_genetic_ancestors.emplace_back(tmp_nb_chr_genetic_anc);
+		nb_bases.emplace_back(tmp_nb_bases);
 	}
 	
 	
@@ -612,11 +675,10 @@ public:
 	
 	
 	
-	static void check_fused_segments(SegmentList &cur_seglist){
+	void check_fused_segments(SegmentList &cur_seglist){
 	
 		cur_seglist.sort();
 
-		int nbdels = 0;
 		
 		//Note: parallelizing this for loop works here because each iteration affects a different vector in cur_seglist.
 		//	If the storing in cur_seglist ever changes, running this loop in parallel may become problematic, e.g. if distinct iterations
@@ -640,7 +702,7 @@ public:
 						cur_seglist.set(i, seg.individ, seg.chrno, seg.chrindex, segprev.a, max(seg.b, segprev.b));
 						
 						indices_to_delete.push_back(i - 1);
-						nbdels++;
+						tmp_nb_fusions++;
 			    		}
 				}
 
@@ -691,6 +753,7 @@ int main() {
 		    cout << "g=" << g << "   npop=" << npop << "   nbseg="<<nbsegments<<"   nbbases="<<segsizes<<endl;
 		}
 	}
+	lineage.write_data("test.csv", config::nb_gen);
 
 
 	return 0;
