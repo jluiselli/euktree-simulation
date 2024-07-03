@@ -488,16 +488,23 @@ public:
 		tmp_nb_fusions = 0;
 		Lineage::check_fused_segments(*cur_seglist);
 
+		Lineage::record_stats_for_this_generatin(*cur_pop, *cur_seglist);
+
+	}
+
+
+	void record_stats_for_this_generatin(Population &pop, SegmentList &seglist) {
 	//TODO ajouter le calcul des stats à la volée au lieu de reparcourir la liste une fois de plus à la fin
+	// Might be a bit tricky 'cause of parallelization ? Need a set per chromosome and then fuse them ?
 		tmp_nb_bases = 0;
 		tmp_nb_segments = 0;
 		std::set<int> ind_ids;
 		std::set<int> chrsm_ids;
 
 		for (uint32_t i = 0; i < 2*config::nbchr; i++){
-			tmp_nb_segments += cur_seglist->sizes[i];
-			for (uint32_t size = 0; size <  cur_seglist->sizes[i]; size++){
-				Segment seg = cur_seglist->segments[i][size];
+			tmp_nb_segments += seglist.sizes[i];
+			for (uint32_t size = 0; size <  seglist.sizes[i]; size++){
+				Segment seg = seglist.segments[i][size];
 				ind_ids.insert(seg.individ);
 				chrsm_ids.insert(2*config::nbchr*seg.individ + 2*seg.chrno + seg.chrindex);
 				tmp_nb_bases += seg.b - seg.a + 1;
