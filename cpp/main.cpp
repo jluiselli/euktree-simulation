@@ -462,8 +462,8 @@ public:
 		tmp_nb_bases = 0;
 
 		// init genealogical data (mainly for ghosts): will be replaced with actual value
-		uint16_t first_common_anc = 0;
-		uint16_t all_common_anc = 0;
+		first_common_anc = 0;
+		all_common_anc = 0;
 	}
 	
 	
