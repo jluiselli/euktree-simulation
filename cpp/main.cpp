@@ -888,19 +888,33 @@ int main(int argc, char* argv[]) {
 
 	interpret_cmd_line_options(argc, argv);
 
+	uint32_t step_print = 10;
+
 	Lineage lineage;
 	cout<<"Starting simulation   s="<<lineage.cur_seglist->get_total_nb_segments()<<"   nbases="<<lineage.cur_seglist->get_total_segment_size()<<endl;
 
+	bool should_continue = true;
+	float threshold_factor = 1.2;
+	uint32_t target_bases = config::nbchr * 2 * config::chrlen * threshold_factor;
+	if (config::nb_gen == 0){
+		std::cout << "will end when nb_bases reach " << target_bases<<std::endl;
+	}
 
-	for (uint32_t g = 0; g < config::nb_gen; ++g) {
+	while ( should_continue ) {
 
 		lineage.backstep();
 
-		if (g % 10 == 0) {
+		if (lineage.back_time % step_print == 0) {
 			size_t nbsegments = lineage.nb_segments.back();
 			size_t segsizes = lineage.nb_bases.back();
 			size_t npop = lineage.nb_ind_genealogical_ancestors.back();
-		    cout << "g=" << g << "   npop=" << npop << "   nbseg="<<nbsegments<<"   nbbases="<<segsizes<<endl;
+			cout << "g=" << lineage.back_time << "   npop=" << npop << "   nbseg="<<nbsegments<<"   nbbases="<<segsizes<<endl;
+		}
+		if ((config::nb_gen != 0) && (lineage.back_time >= config::nb_gen)){
+			should_continue = false;
+		}
+		if ((config::nb_gen == 0) && (lineage.nb_bases.back() < target_bases)){
+			should_continue = false;
 		}
 	}
 	stringstream filename;
