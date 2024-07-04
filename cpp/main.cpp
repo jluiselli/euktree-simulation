@@ -515,11 +515,11 @@ public:
 		tmp_nb_fusions = 0;
 		Lineage::check_fused_segments(*cur_seglist);
 
-		Lineage::record_stats_for_this_generatin(*cur_pop, *cur_seglist);
 		if (all_common_anc == 0){
 			// Deal with genealogical data to check coalescence
 			Lineage::check_coalescence(*cur_pop);
 		}
+		Lineage::record_stats_for_this_generation(*cur_pop, *cur_seglist);
 		back_time++;
 	}
 
@@ -541,7 +541,7 @@ public:
 	}
 
 
-	void record_stats_for_this_generatin(Population &pop, SegmentList &seglist) {
+	void record_stats_for_this_generation(Population &pop, SegmentList &seglist) {
 	//TODO ajouter le calcul des stats à la volée au lieu de reparcourir la liste une fois de plus à la fin
 	// Might be a bit tricky 'cause of parallelization ? Need a set per chromosome and then fuse them ?
 		tmp_nb_bases = 0;
