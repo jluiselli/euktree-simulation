@@ -363,6 +363,8 @@ public:
 	//For indiv i, the nb of breakpoints in chrno->chrindex is chr_nb_breakpoints[i*nbchr*2+2*chrno+chrindex].  0 or 1.
 	vector<uint32_t> chr_nb_breakpoints;
 	
+	vector<std::set<uint32_t>> childs_ids_last_gen;
+	
 	Population(){
 		par_ids.resize( 2 * config::pop_size );		
 		chr_choices.resize( 2 * config::nbchr * config::pop_size ); 	
@@ -404,7 +406,6 @@ public:
 	vector<uint32_t> nb_segments;
 	vector<uint32_t> nb_fusions;
 	vector<uint32_t> nb_bases;
-	uint32_t first_common_anc;
 
 	// to use at each generation
 	uint32_t tmp_nb_segments;
@@ -412,6 +413,13 @@ public:
 	uint32_t tmp_nb_chr_genetic_anc;
 	uint32_t tmp_nb_fusions;
 	uint32_t tmp_nb_bases;
+
+	// Genealogical data (mainly for ghosts)
+	uint16_t first_common_anc;
+	uint16_t all_common_anc;
+
+	// Follow time
+	uint32_t back_time = 0;
 
 	Lineage(){
 		
@@ -429,6 +437,8 @@ public:
 				cur_seglist->add( i, c, 0, 0, config::chrlen -1 );    
 				cur_seglist->add( i, c, 1, 0, config::chrlen -1 );
 			}
+			set<uint32_t>New_set({uint32_t(i)});
+			cur_pop->childs_ids_last_gen.emplace_back(New_set);
 		}
 
 		// data storage TODO : if we have the information of number of generations, 
@@ -447,6 +457,10 @@ public:
 		tmp_nb_chr_genetic_anc = 0;
 		tmp_nb_fusions = 0;
 		tmp_nb_bases = 0;
+
+		// init genealogical data (mainly for ghosts): will be replaced with actual value
+		uint16_t first_common_anc = 0;
+		uint16_t all_common_anc = 0;
 	}
 	
 	
@@ -467,6 +481,13 @@ public:
 			data<<nb_segments[t]<<","<<nb_fusions[t]<<","<<nb_bases[t]<<'\n';
 		}
 		data.close();
+	}
+
+	void write_coal_data(string filename){
+		std::ofstream coal("coal_"+filename);
+		coal<<"first_common_anc_time,all_common_anc_time\n";
+		coal<<first_common_anc<<","<<all_common_anc<<std::endl;
+		coal.close();
 	}
 	
 
@@ -492,7 +513,28 @@ public:
 		Lineage::check_fused_segments(*cur_seglist);
 
 		Lineage::record_stats_for_this_generatin(*cur_pop, *cur_seglist);
+		if (all_common_anc == 0){
+			// Deal with genealogical data to check coalescence
+			Lineage::check_coalescence(*cur_pop);
+		}
+		back_time++;
+	}
 
+
+	void check_coalescence(Population &pop){
+		uint32_t max_nb_childs = 0;
+		uint32_t min_nb_childs = config::pop_size;
+		for (auto s : pop.childs_ids_last_gen){
+			uint32_t size = s.size();
+			if (size > max_nb_childs) max_nb_childs = size;
+			if (size < min_nb_childs) min_nb_childs = size;
+		}
+		if (first_common_anc == 0 && max_nb_childs == config::pop_size){
+			first_common_anc = back_time;
+		}
+		if (min_nb_childs == config::pop_size){
+			all_common_anc = back_time;
+		}
 	}
 
 
@@ -524,9 +566,8 @@ public:
 		nb_ind_genealogical_ancestors.emplace_back(accumulate(pop.members.begin(), pop.members.end(), 0));
 	}
 	
-	
 	//TODO: the next functions are static only because they did not belong to a class before, and this was the easiest way to add them to the Lineage class.
-	static void generate_population(Population &prev_pop, Population &pop_to_fill) {
+	void generate_population(Population &prev_pop, Population &pop_to_fill) {
 
 		//TODO: could be optimized by computing rand parents only for genealogical indivs
 		//chooses two parents for each member of prev_pop
@@ -537,11 +578,25 @@ public:
 
 
 		std::fill(pop_to_fill.members.begin(), pop_to_fill.members.end(), 0);
+		if (all_common_anc == 0) {
+			// We have not reached coalescence yet and need to follow genealogical ancestry
+			pop_to_fill.childs_ids_last_gen.clear();
+			pop_to_fill.childs_ids_last_gen.resize(config::pop_size);
+			std::fill(pop_to_fill.childs_ids_last_gen.begin(), pop_to_fill.childs_ids_last_gen.end(), std::set<uint32_t>());
+		}
+
 
 		for (uint32_t i = 0; i < config::pop_size; ++i) {
 			if (prev_pop.members[i] != 0) {
 				pop_to_fill.members[prev_pop.par_ids[2 * i]] = 1;
 				pop_to_fill.members[prev_pop.par_ids[2 * i + 1]] = 1;
+			}
+			if (all_common_anc == 0){
+				// We have not reached coalescence yet and need to follow genealogical ancestry
+				pop_to_fill.childs_ids_last_gen[prev_pop.par_ids[2 * i]].insert(prev_pop.childs_ids_last_gen[i].begin(),
+														  prev_pop.childs_ids_last_gen[i].end());
+				pop_to_fill.childs_ids_last_gen[prev_pop.par_ids[2 * i + 1]].insert(prev_pop.childs_ids_last_gen[i].begin(),
+														  prev_pop.childs_ids_last_gen[i].end());
 			}
 		}
 
@@ -829,6 +884,7 @@ int main(int argc, char* argv[]) {
 	filename << "nbchr-"<<config::nbchr<<"-chrlen-"<<config::chrlen<<"-nb_gen-"<<config::nb_gen
 	<<"-pop_size-"<<config::pop_size<<"-recomb_rate-"<<config::recomb_rate<<"-seed-"<<config::seed<<".csv";
 	lineage.write_data(filename.str(), config::nb_gen);
+	lineage.write_coal_data(filename.str());
 
 	return 0;
 }
