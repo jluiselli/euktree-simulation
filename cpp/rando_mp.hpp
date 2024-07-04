@@ -1,8 +1,9 @@
 #pragma once
 
 #include <vector>
+#include <limits.h>
 
-#include "rando_xo.hpp"
+//#include "rando_xo.hpp"
 #include <p2rng/p2rng.hpp>
 #include <p2rng/trng/binomial_dist.hpp>
 
@@ -16,25 +17,44 @@ by generating another random seed.  For that, we use rng_xo.
 **/
 namespace rando_mp{
 
-	uint32_t seed;	
+	uint64_t seed;	
+
 
 	
 	void renew_seed(){
-		seed = rando_xo::next_int();
+		//seed = rando_xo::next_int();
+		pcg32 rng(seed);
+		int max = INT_MAX/2;
+		
+		auto t = trng::uniform_int_dist(1, max);
+		seed = t(rng);
+		
+		/*std::random_device dev;
+		std::mt19937 rngmt(dev());
+		std::uniform_int_distribution<std::mt19937::result_type> distro(1,INT_MAX/2);
+
+		seed = distro(rngmt);*/
+		
+
+		
+		return;
+		
+		
 	}
 	
 	
 	//TODO: this uses the basic but fast rng algorithm - which is known to be good enough but does not pass every test
 	void generate_random_integers(std::vector<uint32_t> &vec_to_fill, uint32_t min, uint32_t max, size_t size) {
 		
-		    /*std::random_device dev;
-		    std::mt19937 rng(dev());
-		    std::uniform_int_distribution<std::mt19937::result_type> dist6(min,max-1);
-		    
-		    for (int i = 0; i < vec_to_fill.size(); ++i){
-		    	vec_to_fill[i] = dist6(rng);
-		    }
-		    return;*/
+		//old slow attempt
+		/*std::random_device dev;
+		std::mt19937 rngmt(dev());
+		std::uniform_int_distribution<std::mt19937::result_type> dist6(min,max-1);
+
+		for (int i = 0; i < vec_to_fill.size(); ++i){
+		vec_to_fill[i] = dist6(rngmt);
+		}
+		return;*/
 				
 		pcg32 rng(seed);
 		p2rng::generate_n
@@ -46,11 +66,8 @@ namespace rando_mp{
 		renew_seed();
 	}
 	
-	void init(uint64_t initial_seed, uint32_t intseed1, uint32_t intseed2, uint32_t intseed3, uint32_t intseed4){
+	void init(uint64_t initial_seed){
 		seed = initial_seed;
-		//rng((unsigned long)seed);
-		
-		rando_xo::init(intseed1, intseed2, intseed3, intseed4);
 	}
 	
 	

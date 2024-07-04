@@ -50,12 +50,12 @@ Note: we use uint32_t all over the place - make sure we never overflow.
 
 //TODO: storing all parameters globally is an anti-pattern, no one should ever do that
 namespace config{
-    uint32_t nbchr = 36;
-    uint32_t chrlen = 500000;
-    uint32_t nb_gen = 1000;
-    uint32_t pop_size = 2000;
-    double recomb_rate = 1/((double)chrlen);	
-	uint32_t seed = 432498743;
+	uint32_t nbchr = 36;
+	uint32_t chrlen = 500000;
+	uint32_t nb_gen = 1000;
+	uint32_t pop_size = 2000;
+	double recomb_rate = 1/((double)chrlen);	
+	uint32_t seed = 432498741;
 }
 
 
@@ -406,7 +406,7 @@ public:
 	vector<uint32_t> nb_chr_genetic_ancestors;
 	vector<uint32_t> nb_segments;
 	vector<uint32_t> nb_fusions;
-	vector<uint32_t> nb_bases;
+	vector<uint64_t> nb_bases;
 	vector<uint32_t> super_ghosts;
 
 	// to use at each generation
@@ -414,11 +414,11 @@ public:
 	uint32_t tmp_nb_ind_genetic_anc;
 	uint32_t tmp_nb_chr_genetic_anc;
 	uint32_t tmp_nb_fusions;
-	uint32_t tmp_nb_bases;
+	uint64_t tmp_nb_bases;
 
 	// Genealogical data (mainly for ghosts)
-	uint16_t first_common_anc;
-	uint16_t all_common_anc;
+	uint32_t first_common_anc;
+	uint32_t all_common_anc;
 
 	// Follow time
 	uint32_t back_time = 0;
@@ -640,9 +640,42 @@ public:
 		rando_mp::generate_random_integers(prev_pop.chr_choices, 0, 2, 2 * config::nbchr * config::pop_size);
 
 		
-		//TODO: could be optimized by choosing nb breakpts only for genetic chrsms
+
 		//chooses the number of breakpoints for each chromosome
 		rando_mp::generate_binomials( prev_pop.chr_nb_breakpoints, config::chrlen, config::recomb_rate, 2 * config::nbchr * config::pop_size );
+
+
+		/*
+		Next we pre-calculate the set of breakpoints on each chr.  nb_breakpoints is the sum of nb break across *all* chr, then we generate all break positions one shot 
+		into all_breakpoint_positions.  Each specific chr has its breaks in a sublist of that vector.
+		chr_breakpoint_indices[ index_of_chr ] tells where that sublist starts, that is, the set of break of the chr are 
+		 all_breakpoint_positions[ chr_breakpoint_indices[ index_of_chr ]  :  chr_breakpoint_indices[ index_of_chr ] + prev_pop.chr_nb_breakpoints[ index_of_chr ] ]
+		This is a bit complicated, but this is the price to pay for optimization... 
+		*/
+		uint64_t nb_breakpoints = accumulate(prev_pop.chr_nb_breakpoints.begin(), prev_pop.chr_nb_breakpoints.begin() + 2 * config::nbchr * config::pop_size, 0);
+		vector<uint32_t> all_breakpoint_positions(nb_breakpoints);
+		rando_mp::generate_random_integers(all_breakpoint_positions, 1, config::chrlen, nb_breakpoints);
+		
+		
+		size_t cur_index = 0;
+		vector<int> chr_breakpoint_indices( 2 * config::nbchr * config::pop_size );
+		for (uint32_t chrno = 0; chrno < config::nbchr; ++chrno){
+			for (int chrindex = 0; chrindex < 2; ++chrindex){
+				for (uint32_t individ = 0; individ < config::pop_size; ++individ){
+					size_t index_of_chr = individ * 2 * config::nbchr + 2 * chrno + chrindex;
+					
+					uint32_t nbrecombs = prev_pop.chr_nb_breakpoints[index_of_chr];
+					if (nbrecombs == 0){
+						chr_breakpoint_indices[index_of_chr] = -1;	//indicates no recomb
+					}
+					else{
+						chr_breakpoint_indices[index_of_chr] = cur_index;
+						cur_index += nbrecombs;
+					}				
+				}
+			}	
+		}
+		
 
 
 		
@@ -675,25 +708,42 @@ public:
 					uint32_t parent1_id, parent2_id;
 					std::tie(parent1_id, parent2_id) = prev_pop.get_parents_of(seg.individ);	//sets two variables at once
 
+					size_t index_of_chr = seg.individ * 2 * config::nbchr + 2 * chrno + chrindex;
+					
+					
+					uint32_t nbrecombs = prev_pop.chr_nb_breakpoints[ index_of_chr ];
+					int bpindex = chr_breakpoint_indices[ index_of_chr ];
 
-					//here we choose and sort the number of breakpoints in chromosome from seg.individ, chrno, chrindex
-					//could be optimized by doing batch random choices...
-					uint32_t nbrecombs = prev_pop.chr_nb_breakpoints[ seg.individ * 2 * chrno + 2 * chrno + chrindex ];	//hmm indexing has become complicated
-					//nbrecombs++;	//to do like the python code
+
+					std::vector<uint32_t> recomb_pos_list;
+					if (nbrecombs > 0){
+						recomb_pos_list = vector<uint32_t>(all_breakpoint_positions.begin() + bpindex, all_breakpoint_positions.begin() + bpindex + nbrecombs);
+						std::sort(recomb_pos_list.begin(), recomb_pos_list.end());
+						
+					}
+					
+					/*
+					uint32_t nbrecombs = prev_pop.chr_nb_breakpoints[ index_of_chr ];	//hmm indexing has become complicated
+					
+					
 					std::vector<uint32_t> recomb_pos_list(nbrecombs);
 
 					if (nbrecombs > 0){
 						rando_mp::generate_random_integers(recomb_pos_list, 1, config::chrlen, nbrecombs);
 						std::sort(recomb_pos_list.begin(), recomb_pos_list.end());
+
 					}
+					*/
+					
+					
 					
 					
 					int par_gave_chr, par_id;
 					if (chrindex == 0) { // chrsm A : from parent 1
-					    par_gave_chr = prev_pop.chr_choices[seg.individ * 2 * chrno + 2 * chrno + chrindex];	//not sure about indices
+					    par_gave_chr = prev_pop.chr_choices[index_of_chr];
 					    par_id = parent1_id;
 					} else { // chrsm B : from parent 2
-					    par_gave_chr = prev_pop.chr_choices[seg.individ * 2 * chrno + 2 * chrno + chrindex];
+					    par_gave_chr = prev_pop.chr_choices[index_of_chr];
 					    par_id = parent2_id;
 					}
 					
@@ -879,15 +929,20 @@ void interpret_cmd_line_options(int argc, char* argv[]) {
 
 int main(int argc, char* argv[]) {
 
-	/*
-	these set the seed for the randomizers
-	rando_mp needs and int, plus four uint32_t
-	rando_xo needs four uint32_t for seeds, but it is set by rando_mp, so it is pointless to call it.
-	*/
-	//rando_xo::init(11,22,33,44);
-	rando_mp::init(config::seed, 11, 22, 33, 44);
-
 	interpret_cmd_line_options(argc, argv);
+	
+	rando_mp::init(config::seed);
+	
+	/*
+	for (int i = 0; i < 100; ++i){
+		vector<uint32_t> v(20);
+						rando_mp::generate_binomials( v, 100, (double)0.01, v.size() );
+		for (uint32_t x : v)
+		cout<<x<<" ";
+		cout<<endl;
+	}
+	return 0;
+	*/
 
 	uint32_t step_print = 10;
 
