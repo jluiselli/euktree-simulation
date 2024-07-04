@@ -23,6 +23,7 @@
 #include <future>
 #include <string>
 #include <mutex>
+#include <math.h>
 
 
 //#ifdef USETBB
@@ -56,6 +57,7 @@ namespace config{
     uint32_t pop_size = 2000;
     double recomb_rate = 1/((double)chrlen);	
 	uint32_t seed = 432498743;
+	bool exact_ghosts = true;
 }
 
 
@@ -567,9 +569,16 @@ public:
 		nb_chr_genetic_ancestors.emplace_back(tmp_nb_chr_genetic_anc);
 		nb_bases.emplace_back(tmp_nb_bases);
 		nb_ind_genealogical_ancestors.emplace_back(accumulate(pop.members.begin(), pop.members.end(), 0));
+
 		if (all_common_anc != 0){
-			// all genealogical ancestors are the ancestors of everybody
-			super_ghosts.emplace_back(nb_ind_genealogical_ancestors.back() - nb_ind_genetic_ancestors.back());
+			if (config::exact_ghosts || back_time > all_common_anc){
+				//2nd condition for when non-exact ghosts computation
+				// all genealogical ancestors are the ancestors of everybody
+				super_ghosts.emplace_back(nb_ind_genealogical_ancestors.back() - nb_ind_genetic_ancestors.back());
+			}
+			else {
+				super_ghosts.emplace_back(0);
+			}
 		}
 		else if (first_common_anc == 0){
 			// nobody is the ancestor of everybody
@@ -820,13 +829,14 @@ void print_help(){
 	<<" pop_size : "<<config::pop_size<<"\n"
 	<<" recomb_rate : "<<config::recomb_rate<<"\n"
 	<<" seed : "<<config::seed<<"\n"
+	<<" exact_ghosts : "<<config::exact_ghosts<<" (should be 0 or 1)\n"
 	<<"\nIf nb_gen provided is 0, simulation will run until it approaches the equilibrium.\n";
 }
 
 
 void interpret_cmd_line_options(int argc, char* argv[]) {
   // Define allowed options
-  const char * options_list = "hc:l:g:p:r:s:";
+  const char * options_list = "hc:l:g:p:r:s:e:";
   static struct option long_options_list[] = {
       {"help",      no_argument,        nullptr, 'h'},
       {"nbchr",     required_argument,  nullptr, 'c'},
@@ -835,6 +845,7 @@ void interpret_cmd_line_options(int argc, char* argv[]) {
       {"pop_size",  required_argument,  nullptr, 'p'},
 	  {"recomb_rate",  required_argument,  nullptr, 'r'},
 	  {"seed",      required_argument,  nullptr, 's'},
+	  {"exact_ghosts", required_argument, nullptr, 'e'}
 	//   {"recomb_nb",  no_argument,  nullptr, 'R'},
   };
 
@@ -871,6 +882,10 @@ void interpret_cmd_line_options(int argc, char* argv[]) {
         config::seed = atol(optarg);
         break;
       }
+	  case 'e' : {
+        config::exact_ghosts = atoi(optarg);
+        break;
+      }
     }
   }
 }
@@ -888,10 +903,17 @@ int main(int argc, char* argv[]) {
 	rando_mp::init(config::seed, 11, 22, 33, 44);
 
 	interpret_cmd_line_options(argc, argv);
+	if (config::pop_size > 4000 && config::exact_ghosts){
+		std::cout<<"\n!! Using exact_ghosts and a big population size is not recommended. You should kill the program. Now. !!\n\n";
+	}
 
 	uint32_t step_print = 10;
 
 	Lineage lineage;
+	if (!config::exact_ghosts){
+		lineage.first_common_anc = 10 * log(config::pop_size);
+		lineage.all_common_anc = 10 * log(config::pop_size);
+	}
 	cout<<"Starting simulation   s="<<lineage.cur_seglist->get_total_nb_segments()<<"   nbases="<<lineage.cur_seglist->get_total_segment_size()<<endl;
 
 	bool should_continue = true;
