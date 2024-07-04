@@ -363,6 +363,7 @@ public:
 	//For indiv i, the nb of breakpoints in chrno->chrindex is chr_nb_breakpoints[i*nbchr*2+2*chrno+chrindex].  0 or 1.
 	vector<uint32_t> chr_nb_breakpoints;
 	
+	//Follow the sets of children in last generation to get time of coalescence and ghosts
 	vector<std::set<uint32_t>> childs_ids_last_gen;
 	
 	Population(){
@@ -406,6 +407,7 @@ public:
 	vector<uint32_t> nb_segments;
 	vector<uint32_t> nb_fusions;
 	vector<uint32_t> nb_bases;
+	vector<uint32_t> super_ghosts;
 
 	// to use at each generation
 	uint32_t tmp_nb_segments;
@@ -446,6 +448,7 @@ public:
 		nb_ind_genealogical_ancestors.push_back(config::pop_size);
 		nb_ind_genetic_ancestors.push_back(config::pop_size);
 		nb_chr_genetic_ancestors.push_back(config::pop_size * config::nbchr * 2);
+		super_ghosts.push_back(0);
 		nb_segments.push_back(config::pop_size * config::nbchr * 2);
 		// ^ hard-coded that we take the whole population to start with
 		nb_fusions.push_back(0);
@@ -475,10 +478,10 @@ public:
 	void write_data(string filename, uint32_t finaltime){
 		std::ofstream data(filename);
 		data<<"backtime,nb_ind_genealogical_ancestors,nb_ind_genetic_ancestors,nb_chr_genetic_ancestors";
-		data<<",nb_segments,nb_fusions,nb_bases"<<std::endl;
+		data<<",nb_segments,nb_fusions,nb_bases,nb_super_ghosts"<<std::endl;
 		for (uint32_t t = 0; t < finaltime; t++){
 			data<<t<<","<<nb_ind_genealogical_ancestors[t]<<","<<nb_ind_genetic_ancestors[t]<<","<<nb_chr_genetic_ancestors[t]<<",";
-			data<<nb_segments[t]<<","<<nb_fusions[t]<<","<<nb_bases[t]<<'\n';
+			data<<nb_segments[t]<<","<<nb_fusions[t]<<","<<nb_bases[t]<<","<<super_ghosts[t]<<'\n';
 		}
 		data.close();
 	}
@@ -564,6 +567,26 @@ public:
 		nb_chr_genetic_ancestors.emplace_back(tmp_nb_chr_genetic_anc);
 		nb_bases.emplace_back(tmp_nb_bases);
 		nb_ind_genealogical_ancestors.emplace_back(accumulate(pop.members.begin(), pop.members.end(), 0));
+		if (all_common_anc != 0){
+			// all genealogical ancestors are the ancestors of everybody
+			super_ghosts.emplace_back(nb_ind_genealogical_ancestors.back() - nb_ind_genetic_ancestors.back());
+		}
+		else if (first_common_anc == 0){
+			// nobody is the ancestor of everybody
+			super_ghosts.emplace_back(0);
+		}
+		else {
+			// tricky case
+			uint32_t acc_super_ghosts = 0;
+			for (uint32_t individ = 0; individ < config::pop_size; individ++){
+				//for each individual check if its a superancestor and if its a genealogical ancestor
+				if (pop.childs_ids_last_gen[individ].size() == config::pop_size
+					&& (ind_ids.find(individ) == ind_ids.end())	){
+						acc_super_ghosts++;
+					}
+			}
+			super_ghosts.emplace_back(acc_super_ghosts);
+		}
 	}
 	
 	//TODO: the next functions are static only because they did not belong to a class before, and this was the easiest way to add them to the Lineage class.
