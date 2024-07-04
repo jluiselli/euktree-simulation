@@ -530,7 +530,7 @@ public:
 		for (auto s : pop.childs_ids_last_gen){
 			uint32_t size = s.size();
 			if (size > max_nb_childs) max_nb_childs = size;
-			if (size < min_nb_childs) min_nb_childs = size;
+			if (size != 0 && size < min_nb_childs) min_nb_childs = size;
 		}
 		if (first_common_anc == 0 && max_nb_childs == config::pop_size){
 			first_common_anc = back_time;
