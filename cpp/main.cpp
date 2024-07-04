@@ -404,9 +404,9 @@ public:
 	vector<uint32_t> nb_ind_genealogical_ancestors;
 	vector<uint32_t> nb_ind_genetic_ancestors;
 	vector<uint32_t> nb_chr_genetic_ancestors;
+	vector<uint64_t> nb_bases;
 	vector<uint32_t> nb_segments;
 	vector<uint32_t> nb_fusions;
-	vector<uint32_t> nb_bases;
 	vector<uint32_t> super_ghosts;
 
 	// to use at each generation
@@ -414,7 +414,7 @@ public:
 	uint32_t tmp_nb_ind_genetic_anc;
 	uint32_t tmp_nb_chr_genetic_anc;
 	uint32_t tmp_nb_fusions;
-	uint32_t tmp_nb_bases;
+	uint64_t tmp_nb_bases;
 
 	// Genealogical data (mainly for ghosts)
 	uint16_t first_common_anc;
