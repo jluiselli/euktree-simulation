@@ -942,7 +942,8 @@ int main(int argc, char* argv[]) {
 	}
 	stringstream filename;
 	filename << "nbchr-"<<config::nbchr<<"-chrlen-"<<config::chrlen<<"-nb_gen-"<<config::nb_gen
-	<<"-pop_size-"<<config::pop_size<<"-recomb_rate-"<<config::recomb_rate<<"-seed-"<<config::seed<<".csv";
+	<<"-pop_size-"<<config::pop_size<<"-recomb_rate-"<<config::recomb_rate<<"-seed-"<<config::seed
+	<<"-exact_ghosts-"<<config::exact_ghosts<<".csv";
 	lineage.write_data(filename.str());
 	lineage.write_coal_data(filename.str());
 
