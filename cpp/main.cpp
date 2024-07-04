@@ -819,7 +819,8 @@ void print_help(){
 	<<" nb_gen : "<<config::nb_gen<<"\n"
 	<<" pop_size : "<<config::pop_size<<"\n"
 	<<" recomb_rate : "<<config::recomb_rate<<"\n"
-	<<" seed : "<<config::seed<<"\n";
+	<<" seed : "<<config::seed<<"\n"
+	<<"\nIf nb_gen provided is 0, simulation will run until it approaches the equilibrium.\n";
 }
 
 
