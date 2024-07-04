@@ -23,6 +23,7 @@
 #include <future>
 #include <string>
 #include <mutex>
+#include <math.h>
 
 
 //#ifdef USETBB
@@ -55,7 +56,8 @@ namespace config{
 	uint32_t nb_gen = 1000;
 	uint32_t pop_size = 2000;
 	double recomb_rate = 1/((double)chrlen);	
-	uint32_t seed = 432498741;
+	uint32_t seed = 432498743;
+	bool exact_ghosts = true;
 }
 
 
@@ -404,9 +406,9 @@ public:
 	vector<uint32_t> nb_ind_genealogical_ancestors;
 	vector<uint32_t> nb_ind_genetic_ancestors;
 	vector<uint32_t> nb_chr_genetic_ancestors;
+	vector<uint64_t> nb_bases;
 	vector<uint32_t> nb_segments;
 	vector<uint32_t> nb_fusions;
-	vector<uint64_t> nb_bases;
 	vector<uint32_t> super_ghosts;
 
 	// to use at each generation
@@ -462,8 +464,8 @@ public:
 		tmp_nb_bases = 0;
 
 		// init genealogical data (mainly for ghosts): will be replaced with actual value
-		uint16_t first_common_anc = 0;
-		uint16_t all_common_anc = 0;
+		first_common_anc = 0;
+		all_common_anc = 0;
 	}
 	
 	
@@ -515,11 +517,11 @@ public:
 		tmp_nb_fusions = 0;
 		Lineage::check_fused_segments(*cur_seglist);
 
-		Lineage::record_stats_for_this_generatin(*cur_pop, *cur_seglist);
 		if (all_common_anc == 0){
 			// Deal with genealogical data to check coalescence
 			Lineage::check_coalescence(*cur_pop);
 		}
+		Lineage::record_stats_for_this_generation(*cur_pop, *cur_seglist);
 		back_time++;
 	}
 
@@ -530,7 +532,7 @@ public:
 		for (auto s : pop.childs_ids_last_gen){
 			uint32_t size = s.size();
 			if (size > max_nb_childs) max_nb_childs = size;
-			if (size < min_nb_childs) min_nb_childs = size;
+			if (size != 0 && size < min_nb_childs) min_nb_childs = size;
 		}
 		if (first_common_anc == 0 && max_nb_childs == config::pop_size){
 			first_common_anc = back_time;
@@ -541,7 +543,7 @@ public:
 	}
 
 
-	void record_stats_for_this_generatin(Population &pop, SegmentList &seglist) {
+	void record_stats_for_this_generation(Population &pop, SegmentList &seglist) {
 	//TODO ajouter le calcul des stats à la volée au lieu de reparcourir la liste une fois de plus à la fin
 	// Might be a bit tricky 'cause of parallelization ? Need a set per chromosome and then fuse them ?
 		tmp_nb_bases = 0;
@@ -567,9 +569,16 @@ public:
 		nb_chr_genetic_ancestors.emplace_back(tmp_nb_chr_genetic_anc);
 		nb_bases.emplace_back(tmp_nb_bases);
 		nb_ind_genealogical_ancestors.emplace_back(accumulate(pop.members.begin(), pop.members.end(), 0));
+
 		if (all_common_anc != 0){
-			// all genealogical ancestors are the ancestors of everybody
-			super_ghosts.emplace_back(nb_ind_genealogical_ancestors.back() - nb_ind_genetic_ancestors.back());
+			if (config::exact_ghosts || back_time > all_common_anc){
+				//2nd condition for when non-exact ghosts computation
+				// all genealogical ancestors are the ancestors of everybody
+				super_ghosts.emplace_back(nb_ind_genealogical_ancestors.back() - nb_ind_genetic_ancestors.back());
+			}
+			else {
+				super_ghosts.emplace_back(0);
+			}
 		}
 		else if (first_common_anc == 0){
 			// nobody is the ancestor of everybody
@@ -870,13 +879,14 @@ void print_help(){
 	<<" pop_size : "<<config::pop_size<<"\n"
 	<<" recomb_rate : "<<config::recomb_rate<<"\n"
 	<<" seed : "<<config::seed<<"\n"
+	<<" exact_ghosts : "<<config::exact_ghosts<<" (should be 0 or 1)\n"
 	<<"\nIf nb_gen provided is 0, simulation will run until it approaches the equilibrium.\n";
 }
 
 
 void interpret_cmd_line_options(int argc, char* argv[]) {
   // Define allowed options
-  const char * options_list = "hc:l:g:p:r:s:";
+  const char * options_list = "hc:l:g:p:r:s:e:";
   static struct option long_options_list[] = {
       {"help",      no_argument,        nullptr, 'h'},
       {"nbchr",     required_argument,  nullptr, 'c'},
@@ -885,6 +895,7 @@ void interpret_cmd_line_options(int argc, char* argv[]) {
       {"pop_size",  required_argument,  nullptr, 'p'},
 	  {"recomb_rate",  required_argument,  nullptr, 'r'},
 	  {"seed",      required_argument,  nullptr, 's'},
+	  {"exact_ghosts", required_argument, nullptr, 'e'}
 	//   {"recomb_nb",  no_argument,  nullptr, 'R'},
   };
 
@@ -921,6 +932,10 @@ void interpret_cmd_line_options(int argc, char* argv[]) {
         config::seed = atol(optarg);
         break;
       }
+	  case 'e' : {
+        config::exact_ghosts = atoi(optarg);
+        break;
+      }
     }
   }
 }
@@ -932,21 +947,19 @@ int main(int argc, char* argv[]) {
 	interpret_cmd_line_options(argc, argv);
 	
 	rando_mp::init(config::seed);
-	
-	/*
-	for (int i = 0; i < 100; ++i){
-		vector<uint32_t> v(20);
-						rando_mp::generate_binomials( v, 100, (double)0.01, v.size() );
-		for (uint32_t x : v)
-		cout<<x<<" ";
-		cout<<endl;
+
+	if (config::pop_size > 4000 && config::exact_ghosts){
+		std::cout<<"\n!! Using exact_ghosts and a big population size is not recommended. You should kill the program. Now. !!\n\n";
 	}
-	return 0;
-	*/
+
 
 	uint32_t step_print = 10;
 
 	Lineage lineage;
+	if (!config::exact_ghosts){
+		lineage.first_common_anc = 10 * log(config::pop_size);
+		lineage.all_common_anc = 10 * log(config::pop_size);
+	}
 	cout<<"Starting simulation   s="<<lineage.cur_seglist->get_total_nb_segments()<<"   nbases="<<lineage.cur_seglist->get_total_segment_size()<<endl;
 
 	bool should_continue = true;
@@ -975,7 +988,8 @@ int main(int argc, char* argv[]) {
 	}
 	stringstream filename;
 	filename << "nbchr-"<<config::nbchr<<"-chrlen-"<<config::chrlen<<"-nb_gen-"<<config::nb_gen
-	<<"-pop_size-"<<config::pop_size<<"-recomb_rate-"<<config::recomb_rate<<"-seed-"<<config::seed<<".csv";
+	<<"-pop_size-"<<config::pop_size<<"-recomb_rate-"<<config::recomb_rate<<"-seed-"<<config::seed
+	<<"-exact_ghosts-"<<config::exact_ghosts<<".csv";
 	lineage.write_data(filename.str());
 	lineage.write_coal_data(filename.str());
 
