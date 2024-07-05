@@ -949,7 +949,8 @@ int main(int argc, char* argv[]) {
 	rando_mp::init(config::seed);
 
 	if (config::pop_size > 4000 && config::exact_ghosts){
-		std::cout<<"\n!! Using exact_ghosts and a big population size is not recommended. You should kill the program. Now. !!\n\n";
+		std::cout<<"\n!! Using exact_ghosts and a big population size is not recommended. Auto-conversion to non-exact ghosts\n\n";
+		config::exact_ghosts=false;
 	}
 
 
