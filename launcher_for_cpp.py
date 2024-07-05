@@ -20,15 +20,28 @@ print(sweeps)
 
 
 def launch(d, bin_com):
-    d["recomb_rate"] = d["nb_recomb"]/d["chrlen"]
-    del d["nb_recomb"]   
+    if "nb_recomb" in d:
+        d["recomb_rate"] = d["nb_recomb"]/d["chrlen"]
+        del d["nb_recomb"]
+    if "total_len" in d:
+        d["chrlen"] = int(d["total_len"]/d["nbchr"])
+        del d["total_len"]
+
+    data_file = "nbchr-"+str(d["nbchr"])+"-chrlen-"+str(d["chrlen"])+"-nb_gen-"+str(d["nb_gen"])+"-pop_size-"
+    data_file += str(d["pop_size"])+"-recomb_rate-"+str(d["recomb_rate"])+"-seed-"+str(d["seed"])
+    exact_ghosts = 0 if d["pop_size"] > 4000 else 1
+    data_file += "-exact_ghosts-" + str(exact_ghosts) +".csv"
 
     launching_command = bin_com
     for key in d.keys():
         launching_command = launching_command + " --" + key + " " + str(d[key])
 
     print(launching_command)
-    os.system(launching_command)
+    print(data_file)
+    if os.path.exists(data_file):
+        print("already computed, skipping combination")
+    else:
+        os.system(launching_command)
 
 
 bin_com = os.path.abspath(args.bin)
