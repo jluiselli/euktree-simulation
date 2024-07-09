@@ -18,27 +18,21 @@ by generating another random seed.  For that, we use rng_xo.
 namespace rando_mp{
 
 	uint64_t seed;	
-
-
+	std::random_device dev;
+	std::mt19937 rngmt;
+	std::uniform_int_distribution<std::mt19937::result_type> distro;
 	
 	void renew_seed(){
 		//seed = rando_xo::next_int();
-		pcg32 rng(seed);
+		/*pcg32 rng(seed);
 		int max = INT_MAX/2;
 		
 		auto t = trng::uniform_int_dist(1, max);
-		seed = t(rng);
+		seed = t(rng);*/
 		
-		/*std::random_device dev;
-		std::mt19937 rngmt(dev());
-		std::uniform_int_distribution<std::mt19937::result_type> distro(1,INT_MAX/2);
-
-		seed = distro(rngmt);*/
 		
 
-		
-		return;
-		
+		seed = distro(rngmt);
 		
 	}
 	
@@ -68,6 +62,11 @@ namespace rando_mp{
 	
 	void init(uint64_t initial_seed){
 		seed = initial_seed;
+		
+		rngmt = std::mt19937(initial_seed);
+		distro = std::uniform_int_distribution<std::mt19937::result_type>(1,INT_MAX/2);
+
+
 	}
 	
 	
