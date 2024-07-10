@@ -642,7 +642,7 @@ public:
 
 	
 	
-	static void do_recombinations(Population &prev_pop, Population &next_pop, SegmentList &prev_seglist, SegmentList &next_seglist){
+	void do_recombinations(Population &prev_pop, Population &next_pop, SegmentList &prev_seglist, SegmentList &next_seglist){
 	
 		    
 		//chooses the recombined chromosome obtained from each parent (0 = first chr, 1 = second chr)
@@ -789,14 +789,19 @@ public:
 						}
 						else{   //recomb_pos_list[r] > seg.a and <= seg.b
 						    //current recombination is right inside seg -> send part to parent, increment r
-						    int seg_begin = seg.a;
-						    if (r > 0 and recomb_pos_list[r - 1] > seg.a and recomb_pos_list[r - 1] <= seg.b)
-							seg_begin = recomb_pos_list[r - 1];
-						    
-						    next_seglist.add(par_id, seg.chrno, par_gave_chr, seg_begin, recomb_pos_list[r] - 1);
+							if (r > 0 and recomb_pos_list[r - 1] == recomb_pos_list[r]){
+								r += 1; //nothing happens
+							}
+							else {
+								int seg_begin = seg.a;
+								if (r > 0 and recomb_pos_list[r - 1] > seg.a and recomb_pos_list[r - 1] <= seg.b)
+								seg_begin = recomb_pos_list[r - 1];
 
-						    r += 1;
-						    par_gave_chr = abs(par_gave_chr - 1);
+								next_seglist.add(par_id, seg.chrno, par_gave_chr, seg_begin, recomb_pos_list[r] - 1);
+
+								r += 1;
+								par_gave_chr = abs(par_gave_chr - 1);
+							}
 						}
 						
 						if (increment_s){
