@@ -409,6 +409,8 @@ public:
 	vector<uint64_t> nb_bases;
 	vector<uint32_t> nb_segments;
 	vector<uint32_t> nb_fusions;
+	vector<uint32_t> nb_seg_coalescences;
+	vector<uint32_t> nb_splits;
 	vector<uint32_t> super_ghosts;
 
 	// to use at each generation
@@ -416,6 +418,8 @@ public:
 	uint32_t tmp_nb_ind_genetic_anc;
 	uint32_t tmp_nb_chr_genetic_anc;
 	uint32_t tmp_nb_fusions;
+	uint32_t tmp_nb_seg_coalescences;
+	uint32_t tmp_nb_splits;
 	uint64_t tmp_nb_bases;
 
 	// Genealogical data (mainly for ghosts)
@@ -454,6 +458,8 @@ public:
 		nb_segments.push_back(config::pop_size * config::nbchr * 2);
 		// ^ hard-coded that we take the whole population to start with
 		nb_fusions.push_back(0);
+		nb_seg_coalescences.push_back(0);
+		nb_splits.push_back(0);
 		nb_bases.push_back(config::pop_size * config::nbchr * 2 * config::chrlen);
 
 		// To use at each generation
@@ -461,6 +467,8 @@ public:
 		tmp_nb_ind_genetic_anc = 0;
 		tmp_nb_chr_genetic_anc = 0;
 		tmp_nb_fusions = 0;
+		tmp_nb_seg_coalescences = 0;
+		tmp_nb_splits = 0;
 		tmp_nb_bases = 0;
 
 		// init genealogical data (mainly for ghosts): will be replaced with actual value
@@ -480,10 +488,10 @@ public:
 	void write_data(string filename){
 		std::ofstream data(filename);
 		data<<"backtime,nb_ind_genealogical_ancestors,nb_ind_genetic_ancestors,nb_chr_genetic_ancestors";
-		data<<",nb_segments,nb_fusions,nb_bases,nb_super_ghosts"<<std::endl;
+		data<<",nb_segments,nb_fusions,nb_seg_coal,nb_splits,nb_bases,nb_super_ghosts"<<std::endl;
 		for (uint32_t t = 0; t < back_time; t++){
 			data<<t<<","<<nb_ind_genealogical_ancestors[t]<<","<<nb_ind_genetic_ancestors[t]<<","<<nb_chr_genetic_ancestors[t]<<",";
-			data<<nb_segments[t]<<","<<nb_fusions[t]<<","<<nb_bases[t]<<","<<super_ghosts[t]<<'\n';
+			data<<nb_segments[t]<<","<<nb_fusions[t]<<","<<nb_seg_coalescences[t]<<","<<nb_splits[t]<<","<<nb_bases[t]<<","<<super_ghosts[t]<<'\n';
 		}
 		data.close();
 	}
@@ -501,6 +509,7 @@ public:
 		//fill the temp_pop with the next_pop.  
 		Lineage::generate_population(*cur_pop, *temp_pop);
 
+		tmp_nb_splits = 0;
 		//fill the temp_seglist with the new segments
 		Lineage::do_recombinations(*cur_pop, *temp_pop, *cur_seglist, *temp_seglist);
 
@@ -515,6 +524,7 @@ public:
 		temp_seglist = even_more_temporary_seglist;
 		
 		tmp_nb_fusions = 0;
+		tmp_nb_seg_coalescences = 0;
 		Lineage::check_fused_segments(*cur_seglist);
 
 		if (all_common_anc == 0){
@@ -564,6 +574,8 @@ public:
 		tmp_nb_chr_genetic_anc = chrsm_ids.size();
 
 		nb_fusions.emplace_back(tmp_nb_fusions);
+		nb_seg_coalescences.emplace_back(tmp_nb_seg_coalescences);
+		nb_splits.emplace_back(tmp_nb_splits);
 		nb_segments.emplace_back(tmp_nb_segments);
 		nb_ind_genetic_ancestors.emplace_back(tmp_nb_ind_genetic_anc);
 		nb_chr_genetic_ancestors.emplace_back(tmp_nb_chr_genetic_anc);
@@ -793,6 +805,7 @@ public:
 								r += 1; //nothing happens
 							}
 							else {
+								tmp_nb_splits++;
 								int seg_begin = seg.a;
 								if (r > 0 and recomb_pos_list[r - 1] > seg.a and recomb_pos_list[r - 1] <= seg.b)
 								seg_begin = recomb_pos_list[r - 1];
@@ -846,6 +859,8 @@ public:
 					//cout<<"segbef.a="<<seg.a<<" segbef.b="<<seg.b<<endl;
 					Segment& segprev = cur_seglist.get(i - 1, chrno, chrindex);
 			    		if (seg.individ == segprev.individ && seg.a <= segprev.b+1){
+							if (segprev.b+1 == seg.a){ tmp_nb_seg_coalescences++; }
+							else { tmp_nb_fusions++; }
 						
 						//seg.a = segprev.a;
 						//seg.b = max(seg.b,segprev.b);
@@ -853,7 +868,6 @@ public:
 						cur_seglist.set(i, seg.individ, seg.chrno, seg.chrindex, segprev.a, max(seg.b, segprev.b));
 						
 						indices_to_delete.push_back(i - 1);
-						tmp_nb_fusions++;
 			    		}
 				}
 
