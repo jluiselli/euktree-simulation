@@ -983,7 +983,7 @@ int main(int argc, char* argv[]) {
 	cout<<"Starting simulation   s="<<lineage.cur_seglist->get_total_nb_segments()<<"   nbases="<<lineage.cur_seglist->get_total_segment_size()<<endl;
 
 	bool should_continue = true;
-	float threshold_factor = 1.2;
+	float threshold_factor = 1;
 	uint32_t target_bases = config::nbchr * 2 * config::chrlen * threshold_factor;
 	if (config::nb_gen == 0){
 		std::cout << "will end when nb_bases reach " << target_bases<<std::endl;
