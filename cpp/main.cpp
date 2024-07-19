@@ -445,8 +445,10 @@ public:
 				cur_seglist->add( i, c, 0, 0, config::chrlen -1 );    
 				cur_seglist->add( i, c, 1, 0, config::chrlen -1 );
 			}
-			set<uint32_t>New_set({uint32_t(i)});
-			cur_pop->childs_ids_last_gen.emplace_back(New_set);
+			if (config::exact_ghosts){
+				set<uint32_t>New_set({uint32_t(i)});
+				cur_pop->childs_ids_last_gen.emplace_back(New_set);
+			}
 		}
 
 		// data storage TODO : if we have the information of number of generations, 
@@ -527,7 +529,7 @@ public:
 		tmp_nb_seg_coalescences = 0;
 		Lineage::check_fused_segments(*cur_seglist);
 
-		if (all_common_anc == 0){
+		if (config::exact_ghosts && all_common_anc == 0){
 			// Deal with genealogical data to check coalescence
 			Lineage::check_coalescence(*cur_pop);
 		}
