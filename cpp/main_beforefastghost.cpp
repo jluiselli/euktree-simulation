@@ -6,12 +6,11 @@
 #include <algorithm>
 #include <array>
 #include <set>
-#include <map>
 
 #include <stdint.h>
 #include <getopt.h>
-  
-#include "rando_xo.hpp" 
+
+#include "rando_xo.hpp"
 #include "rando_mp.hpp"
 
 #include "pdqsort.h"
@@ -24,18 +23,15 @@
 #include <future>
 #include <string>
 #include <mutex>
-
+#include <math.h>
 
 
 //#ifdef USETBB
 //	#include <execution>
 //#endif
 
-#include "ewah/ewah.h"
-using namespace ewah;
-typedef EWAHBoolArray<uint32_t> bitmap;
-
 using namespace std;
+
 
 
 /**
@@ -92,8 +88,7 @@ struct Segment{
         
         }
         
-        Segment(uint32_t individ, uint32_t chrno, uint32_t chrindex, uint32_t a, uint32_t b) 
-			: individ(individ), chrno(chrno), chrindex(chrindex), a(a), b(b){
+        Segment(uint32_t individ, uint32_t chrno, uint32_t chrindex, uint32_t a, uint32_t b) : individ(individ), chrno(chrno), chrindex(chrindex), a(a), b(b){
         	
         }
         
@@ -371,11 +366,8 @@ public:
 	vector<uint32_t> chr_nb_breakpoints;
 	
 	//Follow the sets of children in last generation to get time of coalescence and ghosts
-	//vector<std::set<uint32_t>> childs_ids_last_gen;
-	//vector<bitmap> childs_ids_last_gen;
-	//vector<roaring::Roaring> childs_ids_last_gen;
+	vector<std::set<uint32_t>> childs_ids_last_gen;
 	
-		
 	Population(){
 		par_ids.resize( 2 * config::pop_size );		
 		chr_choices.resize( 2 * config::nbchr * config::pop_size ); 	
@@ -393,162 +385,6 @@ public:
 
 
 
-
-
-#define MAX_ARG_GEN 101
-
-class ARGInfo{
-public:
-	
-	/**
-	IMPORTANT: because children are stored in a bitmap, the set of children of an indiv MUST be added in increasing order.
-	This is because bitmap wants its bit sets in increasing order, otherwise it breaks.
-	Learned this the hard way when I had to debug - consider changing to another data structure at some point.
-	Also see comment in set_parents
-	**/
-	vector< map<uint32_t, bitmap> > children_per_gen;	//children_per_gen[g][i] = set of children of indiv i at gen g
-	uint32_t chunk_size;
-	
-	//don't forget to assign bits in order!
-	vector<bitmap> genetic_anc_per_gen;					//genetic_anc_per_gen[g] = set of genetic ancestors per generation
-
-	//vector< map<uint32_t, bitmap> > all_anc_per_chunk;	//all_anc_per_chunk[g][c] = indivs at gen g that are ancestors of everyone in chunk c
-	
-	
-	ARGInfo(){
-		set_chunk_size(1000);
-		children_per_gen.resize(MAX_ARG_GEN);
-		genetic_anc_per_gen.resize(MAX_ARG_GEN);
-		//all_anc_per_chunk.resize(MAX_ARG_GEN);
-	}
-	
-	
-	
-	void set_chunk_size(uint32_t chunk_size){
-		this->chunk_size = chunk_size;
-	
-	}
-	
-	
-	uint32_t get_number_of_chunks(){
-		return ceil( (float)config::pop_size / (float)chunk_size );
-	}
-	
-	
-	
-	/**
-	This tells parent1 and parent2 that indiv is one of their children.
-	IMPORTANT: because children are stored in a bitmap, set_parents MUST be called with indiv in increasing order.
-	This is because bitmap wants its bit sets in increasing order, otherwise it breaks.
-	Learned this the hard way when I had to debug - consider changing to another data structure at some point.
-	**/
-	void set_parents(uint32_t indiv, uint32_t gen_of_indiv, uint32_t parent1, uint32_t parent2){
-		if (gen_of_indiv + 1 >= children_per_gen.size()){
-			cout<<"Trying to set parents at gen="<<gen_of_indiv<<" but MAX_ARG_GEN="<<MAX_ARG_GEN<<", will ignore"<<endl;
-			return;
-		}
-		
-		children_per_gen[ gen_of_indiv + 1 ][parent1].set(indiv);
-		children_per_gen[ gen_of_indiv + 1 ][parent2].set(indiv);
-	}
-	
-	
-	
-	
-	//returnvalue[g] = set of indivs at gen g that are ancestors of everyone in chunk, g up to maxgen
-	vector<bitmap> compute_all_anc_chunk(uint32_t chunk_no, uint32_t maxgen){
-		
-		vector<bitmap> retvec(maxgen + 1);	//don't forget to set bits in order
-
-		//[i1, i2) = range of indivs in chunk
-		uint32_t i1 = chunk_no * this->chunk_size;
-		uint32_t i2 = min( (chunk_no + 1) * this->chunk_size, config::pop_size );
-		
-		
-		//cur_desc[i] = set of descendants of indiv i in the range [i1, i2 - 1] in current generation (init gen = 0)
-		//updated each iteration
-		vector<bitmap> cur_desc;
-		cur_desc.resize(config::pop_size);
-		
-		//at gen = 0, descendants of i is only i itself
-		for (uint32_t i = i1; i < i2; ++i){
-			cur_desc[i].set(i);	//sets bits in order
-		}
-		
-		
-		vector<bitmap> next_desc;
-		next_desc.resize(config::pop_size);
-		
-		uint32_t nbanc = 0;
-		
-		//then update cur_desc for gen=1, 2, ..., gen
-		for (uint32_t g = 1; g <= maxgen; ++g){
-			
-			//the loop below assumes that cur_desc contains the chunk descendants of every indiv for 
-			//gen g-1, and puts into next_desc the descendants of gen g for each indiv, by taking the union of desc of their children.
-			
-			#pragma omp parallel for num_threads(4)
-			for (uint32_t i = 0; i < config::pop_size; ++i){
-				next_desc[i].reset();
-				
-				if (children_per_gen[g].count(i)){
-					
-					bitmap& children = children_per_gen[g][i];
-					
-					for (uint32_t ch : children){
-						next_desc[i] = next_desc[i] | cur_desc[ch];
-					}
-				}
-			}
-			
-			cur_desc.swap(next_desc);	//omg I use swap so clever, previously was "cur_desc = next_desc;"
-			
-			
-			//if any indiv has the whole chunk as descendants, we record it
-			for (uint32_t i = 0; i < config::pop_size; ++i){
-				if (cur_desc[i].numberOfOnes() == (i2 - i1)){
-					retvec[g].set(i);	//sets bits in order
-				}
-			}
-		}
-
-		return retvec;
-	}
-	
-	
-	
-	
-	
-	vector<bitmap> get_all_anc(uint32_t maxgen){
-		
-		uint32_t nb_chunks = ceil( (float)config::pop_size / (float)chunk_size );
-		
-		//all_anc[g] = set of indivs that are ancestors of everyone in generation g
-		vector<bitmap> all_anc(maxgen + 1);
-
-		
-		for (uint32_t c = 0; c < nb_chunks; ++c){
-
-			vector<bitmap> all_anc_in_chunk = compute_all_anc_chunk(c, maxgen);
-
-			for (uint32_t g = 1; g <= maxgen; ++g) {
-
-				//if c == 0, all_anc starts with the all-ancestors of chunk 0 (since it is not initialized)
-				//then for c > 0, we retain only those that are all-ancestors so far, and ancestor of the next chunk
-				if (c == 0)
-					all_anc[g] = all_anc[g] | all_anc_in_chunk[g];
-				else 
-					all_anc[g] = all_anc[g] & all_anc_in_chunk[g];
-			}		
-		}
-
-		
-		
-		return all_anc;
-		
-	}
-
-};
 
 
 
@@ -589,14 +425,12 @@ public:
 	// Genealogical data (mainly for ghosts)
 	uint32_t first_common_anc;
 	uint32_t all_common_anc;
-	ARGInfo arg_info;
 
 	// Follow time
 	uint32_t back_time = 0;
 
 	Lineage(){
-		back_time = 0;
-		arg_info.set_chunk_size(1000);
+		
 		cur_pop = new Population();
 		std::fill(cur_pop->members.begin(), cur_pop->members.end(), 1);
 
@@ -611,10 +445,10 @@ public:
 				cur_seglist->add( i, c, 0, 0, config::chrlen -1 );    
 				cur_seglist->add( i, c, 1, 0, config::chrlen -1 );
 			}
-			/*if (config::exact_ghosts){
+			if (config::exact_ghosts){
 				set<uint32_t>New_set({uint32_t(i)});
 				cur_pop->childs_ids_last_gen.emplace_back(New_set);
-			}*/
+			}
 		}
 
 		// data storage TODO : if we have the information of number of generations, 
@@ -695,131 +529,49 @@ public:
 		tmp_nb_seg_coalescences = 0;
 		Lineage::check_fused_segments(*cur_seglist);
 
-		Lineage::record_stats_for_this_generation(*cur_pop, *cur_seglist);
 		if (config::exact_ghosts && all_common_anc == 0){
 			// Deal with genealogical data to check coalescence
-			Lineage::check_coalescence();
+			Lineage::check_coalescence(*cur_pop);
 		}
-		
+		Lineage::record_stats_for_this_generation(*cur_pop, *cur_seglist);
 		back_time++;
 	}
 
 
-	
-	/*
-	* Assuming that we never reached a state of only superancestors, 
-	* this function:
-	* 1) finds the first generation with a superancestor (first_common_anc)
-	* 2) finds the first generation with ONLY superancestors (all_common_anc)
-	* 3) fills the superghosts array
-	* The function replays evolution from gen 0 to back_time, so we only run it at certain generations.
-	* If run twice, data from previous calculation is reset.
-	*/
-	void check_coalescence(){
-	
-		if (all_common_anc != 0)
-			return;	//nothing more to do here, only super-ancestors from now on
-	
-		if (back_time % 70 == 0 && back_time > 0) {	//70 generations should be enough to reach all_common_anc state, even with 1M pop
-
-			super_ghosts.clear();
-			first_common_anc = 0;
-			all_common_anc = 0;
-			
-			vector<bitmap> all_anc = arg_info.get_all_anc(back_time);
-
-			for (uint32_t g = 0; g <= back_time; g++) {
-
-
-				//debug stuff 
-				//cout << "all_anc[g]=" << g << " : " << all_anc[g].numberOfOnes() << 
-				//		"   nb_ind_genealogical_ancestors[g]="<< nb_ind_genealogical_ancestors[g]<<endl;
-
-
-				//check if g is first generation with a super-ancestor (genealogical)
-				if (first_common_anc == 0 && !all_anc[g].empty()) {
-					first_common_anc = g;
-
-					//cout << "first_common_anc=" << g << endl;
-				}
-
-
-				//check if g is first generation with ONLY super-ancestors
-				if (first_common_anc != 0 && all_common_anc == 0) {
-					
-					//nb gen ancestors should have been computed in record_stats_for_this_generation
-					uint32_t nb_gen_ancestors = nb_ind_genealogical_ancestors[g];
-					if (all_anc[g].numberOfOnes() == nb_gen_ancestors) {
-						all_common_anc = g;
-
-						//cout << "all_common_anc=" << g << endl;
-					}
-				}
-
-
-				//then record number of superghosts
-				if (first_common_anc == 0) {
-					super_ghosts.emplace_back(0);
-				}
-				else{
-					//super ghosts = superancestors but NOT genetic ancestor
-					bitmap superghosts = (all_anc[g] - arg_info.genetic_anc_per_gen[g]);
-					super_ghosts.emplace_back(superghosts.numberOfOnes());
-				}
-			}
-
-
-		}
-	
-		/*uint32_t max_nb_childs = 0;
+	void check_coalescence(Population &pop){
+		uint32_t max_nb_childs = 0;
 		uint32_t min_nb_childs = config::pop_size;
 		for (auto s : pop.childs_ids_last_gen){
 			uint32_t size = s.size();
 			if (size > max_nb_childs) max_nb_childs = size;
-			if (size < min_nb_childs) min_nb_childs = size;
+			if (size != 0 && size < min_nb_childs) min_nb_childs = size;
 		}
 		if (first_common_anc == 0 && max_nb_childs == config::pop_size){
 			first_common_anc = back_time;
 		}
 		if (min_nb_childs == config::pop_size){
 			all_common_anc = back_time;
-		}*/
+		}
 	}
 
 
 	void record_stats_for_this_generation(Population &pop, SegmentList &seglist) {
-	
+	//TODO ajouter le calcul des stats à la volée au lieu de reparcourir la liste une fois de plus à la fin
+	// Might be a bit tricky 'cause of parallelization ? Need a set per chromosome and then fuse them ?
 		tmp_nb_bases = 0;
 		tmp_nb_segments = 0;
-
-		std::set<int> chrsm_ids;
 		std::set<int> ind_ids;
+		std::set<int> chrsm_ids;
 
 		for (uint32_t i = 0; i < 2*config::nbchr; i++){
 			tmp_nb_segments += seglist.sizes[i];
-			for (uint32_t size = 0; size < seglist.sizes[i]; size++){
+			for (uint32_t size = 0; size <  seglist.sizes[i]; size++){
 				Segment seg = seglist.segments[i][size];
 				ind_ids.insert(seg.individ);
 				chrsm_ids.insert(2*config::nbchr*seg.individ + 2*seg.chrno + seg.chrindex);
 				tmp_nb_bases += seg.b - seg.a + 1;
 			}
 		}
-		
-		
-		//we need to remember genetic ancestors for when we compute superghosts later on
-		if (back_time < MAX_ARG_GEN - 1) {
-			
-			//must build bitmap for arginfo.  The nice thing about std::set is that enumeration is in sorted order.
-			bitmap ind_bitmap;
-			for (int id : ind_ids){
-				ind_bitmap.set(id);
-			}
-			
-			//why back_time + 1?  because ind_ids are the parents of the upcoming generation, but back_time was not incremented yet
-			arg_info.genetic_anc_per_gen[back_time + 1] = ind_bitmap;	
-		}
-		
-
 		tmp_nb_ind_genetic_anc = ind_ids.size();
 		tmp_nb_chr_genetic_anc = chrsm_ids.size();
 
@@ -830,10 +582,11 @@ public:
 		nb_ind_genetic_ancestors.emplace_back(tmp_nb_ind_genetic_anc);
 		nb_chr_genetic_ancestors.emplace_back(tmp_nb_chr_genetic_anc);
 		nb_bases.emplace_back(tmp_nb_bases);
-		nb_ind_genealogical_ancestors.emplace_back(std::accumulate(pop.members.begin(), pop.members.end(), 0));
+		nb_ind_genealogical_ancestors.emplace_back(accumulate(pop.members.begin(), pop.members.end(), 0));
 
 		if (all_common_anc != 0){
 			if (config::exact_ghosts || back_time > all_common_anc){
+				//2nd condition for when non-exact ghosts computation
 				// all genealogical ancestors are the ancestors of everybody
 				super_ghosts.emplace_back(nb_ind_genealogical_ancestors.back() - nb_ind_genetic_ancestors.back());
 			}
@@ -841,8 +594,7 @@ public:
 				super_ghosts.emplace_back(0);
 			}
 		}
-		//below is now handled by check coalescence
-		/*else if (first_common_anc == 0){
+		else if (first_common_anc == 0){
 			// nobody is the ancestor of everybody
 			super_ghosts.emplace_back(0);
 		}
@@ -857,7 +609,7 @@ public:
 					}
 			}
 			super_ghosts.emplace_back(acc_super_ghosts);
-		}*/
+		}
 	}
 	
 	//TODO: the next functions are static only because they did not belong to a class before, and this was the easiest way to add them to the Lineage class.
@@ -872,7 +624,12 @@ public:
 
 
 		std::fill(pop_to_fill.members.begin(), pop_to_fill.members.end(), 0);
-		
+		if (all_common_anc == 0) {
+			// We have not reached coalescence yet and need to follow genealogical ancestry
+			pop_to_fill.childs_ids_last_gen.clear();
+			pop_to_fill.childs_ids_last_gen.resize(config::pop_size);
+			std::fill(pop_to_fill.childs_ids_last_gen.begin(), pop_to_fill.childs_ids_last_gen.end(), std::set<uint32_t>());
+		}
 
 
 		for (uint32_t i = 0; i < config::pop_size; ++i) {
@@ -882,18 +639,10 @@ public:
 			}
 			if (all_common_anc == 0){
 				// We have not reached coalescence yet and need to follow genealogical ancestry
-				
-				if (back_time < MAX_ARG_GEN - 1){
-				
-					if (prev_pop.members[i] == 1){
-						uint32_t parent1 = prev_pop.par_ids[2 * i];
-						uint32_t parent2 = prev_pop.par_ids[2 * i + 1];
-						
-						//NOTE: SET_PARENT ONLY WORKS BECAUSE WE ARE SENDING i's IN INCREASING ORDER
-						//otherwise, bitset data structure would break
-						arg_info.set_parents(i, back_time, parent1, parent2);
-					}
-				}			
+				pop_to_fill.childs_ids_last_gen[prev_pop.par_ids[2 * i]].insert(prev_pop.childs_ids_last_gen[i].begin(),
+														  prev_pop.childs_ids_last_gen[i].end());
+				pop_to_fill.childs_ids_last_gen[prev_pop.par_ids[2 * i + 1]].insert(prev_pop.childs_ids_last_gen[i].begin(),
+														  prev_pop.childs_ids_last_gen[i].end());
 			}
 		}
 
@@ -914,7 +663,7 @@ public:
 		rando_mp::generate_random_integers(prev_pop.chr_choices, 0, 2, 2 * config::nbchr * config::pop_size);
 
 		
-		//TODO: could be optimized by choosing nb breakpts only for genetic chrsms
+
 		//chooses the number of breakpoints for each chromosome
 		rando_mp::generate_binomials( prev_pop.chr_nb_breakpoints, config::chrlen, config::recomb_rate, 2 * config::nbchr * config::pop_size );
 
@@ -1220,10 +969,10 @@ int main(int argc, char* argv[]) {
 	
 	rando_mp::init(config::seed);
 
-	/*if (config::pop_size > 4000 && config::exact_ghosts){
+	if (config::pop_size > 4000 && config::exact_ghosts){
 		std::cout<<"\n!! Using exact_ghosts and a big population size is not recommended. Auto-conversion to non-exact ghosts\n\n";
 		config::exact_ghosts=false;
-	}*/
+	}
 
 
 	uint32_t step_print = 10;
