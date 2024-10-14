@@ -62,6 +62,7 @@ namespace config{
 	double recomb_rate = 1/((double)chrlen);	
 	uint32_t seed = 432498743;
 	bool exact_ghosts = true;
+	uint32_t init_nb_indiv = 0;
 }
 
 
@@ -431,7 +432,7 @@ public:
 	
 	
 	uint32_t get_number_of_chunks(){
-		return ceil( (float)config::pop_size / (float)chunk_size );
+		return ceil( (float)config::init_nb_indiv / (float)chunk_size );
 	}
 	
 	
@@ -463,6 +464,7 @@ public:
 		//[i1, i2) = range of indivs in chunk
 		uint32_t i1 = chunk_no * this->chunk_size;
 		uint32_t i2 = min( (chunk_no + 1) * this->chunk_size, config::pop_size );
+		uint32_t nb_followed_ind_in_chunk = 0;
 		
 		
 		//cur_desc[i] = set of descendants of indiv i in the range [i1, i2 - 1] in current generation (init gen = 0)
@@ -472,7 +474,11 @@ public:
 		
 		//at gen = 0, descendants of i is only i itself
 		for (uint32_t i = i1; i < i2; ++i){
-			cur_desc[i].set(i);	//sets bits in order
+			if (i < config::init_nb_indiv){
+				cur_desc[i].set(i);	//sets bits in order
+				nb_followed_ind_in_chunk++;
+			}
+			// else : not an offspring we want to follow
 		}
 		
 		
@@ -506,7 +512,7 @@ public:
 			
 			//if any indiv has the whole chunk as descendants, we record it
 			for (uint32_t i = 0; i < config::pop_size; ++i){
-				if (cur_desc[i].numberOfOnes() == (i2 - i1)){
+				if (cur_desc[i].numberOfOnes() == nb_followed_ind_in_chunk){
 					retvec[g].set(i);	//sets bits in order
 				}
 			}
@@ -606,7 +612,7 @@ public:
 		cur_seglist = new SegmentList();
 		temp_seglist = new SegmentList();
 
-		for (size_t i = 0; i < config::pop_size; ++i){
+		for (size_t i = 0; i < config::init_nb_indiv; ++i){
 			for (size_t c = 0; c < config::nbchr; ++c){
 				cur_seglist->add( i, c, 0, 0, config::chrlen -1 );    
 				cur_seglist->add( i, c, 1, 0, config::chrlen -1 );
@@ -1141,14 +1147,15 @@ public:
 
 void print_help(){
 	std::cout<<"Command line usage:\n"
-	<<"./simchr -c nb_of_chrsm -l chrsm_len -g nb_generations -p population_size -r recombination_rate -s seed_for_prng\n"
+	<<"./simchr -c nb_of_chrsm -l chrsm_len -g nb_generations -p population_size -i init_nb_indiv -r recombination_rate -s seed_for_prng\n"
 	<<"or \n"
-	<<"./simchr --nbchr nb_of_chrsm --chrlen chrsm_len --nb_gen nb_generations --pop_size population_size --recomb_rate recombination_rate --seed seed_for_prng\n"
+	<<"./simchr --nbchr nb_of_chrsm --chrlen chrsm_len --nb_gen nb_generations --pop_size population_size --init_nb_indiv nb_of_indiv_to_init_segments --recomb_rate recombination_rate --seed seed_for_prng\n"
 	<<"or any combination of short/long name ! No parameter is mandatory. In absence of specifications, default values are:\n"
 	<<" nbchr : "<<config::nbchr<<"\n"
 	<<" chrlen : "<<config::chrlen<<"\n"
 	<<" nb_gen : "<<config::nb_gen<<"\n"
 	<<" pop_size : "<<config::pop_size<<"\n"
+	<<" init_nb_indiv : whole population.\n"
 	<<" recomb_rate : "<<config::recomb_rate<<"\n"
 	<<" seed : "<<config::seed<<"\n"
 	<<" exact_ghosts : "<<config::exact_ghosts<<" (should be 0 or 1)\n"
@@ -1158,7 +1165,7 @@ void print_help(){
 
 void interpret_cmd_line_options(int argc, char* argv[]) {
   // Define allowed options
-  const char * options_list = "hc:l:g:p:r:s:e:";
+  const char * options_list = "hc:l:g:p:r:s:e:i:";
   static struct option long_options_list[] = {
       {"help",      no_argument,        nullptr, 'h'},
       {"nbchr",     required_argument,  nullptr, 'c'},
@@ -1167,7 +1174,8 @@ void interpret_cmd_line_options(int argc, char* argv[]) {
       {"pop_size",  required_argument,  nullptr, 'p'},
 	  {"recomb_rate",  required_argument,  nullptr, 'r'},
 	  {"seed",      required_argument,  nullptr, 's'},
-	  {"exact_ghosts", required_argument, nullptr, 'e'}
+	  {"exact_ghosts", required_argument, nullptr, 'e'},
+	  {"init_nb_indiv", required_argument, nullptr, 'i'}
 	//   {"recomb_nb",  no_argument,  nullptr, 'R'},
   };
 
@@ -1208,6 +1216,9 @@ void interpret_cmd_line_options(int argc, char* argv[]) {
         config::exact_ghosts = atoi(optarg);
         break;
       }
+	  case 'i' : {
+		config::init_nb_indiv = atol(optarg);
+	  }
     }
   }
 }
@@ -1217,6 +1228,11 @@ void interpret_cmd_line_options(int argc, char* argv[]) {
 int main(int argc, char* argv[]) {
 
 	interpret_cmd_line_options(argc, argv);
+	if (config::init_nb_indiv == 0){
+		std::cout<<"init_nb_indiv not specified, follow whole population"<<std::endl;
+		// If not specified, we use the whole population as starting point
+		config::init_nb_indiv = config::pop_size;
+	}
 	
 	rando_mp::init(config::seed);
 
@@ -1261,7 +1277,8 @@ int main(int argc, char* argv[]) {
 	}
 	stringstream filename;
 	filename << "nbchr-"<<config::nbchr<<"-chrlen-"<<config::chrlen<<"-nb_gen-"<<config::nb_gen
-	<<"-pop_size-"<<config::pop_size<<"-recomb_rate-"<<config::recomb_rate<<"-seed-"<<config::seed
+	<<"-pop_size-"<<config::pop_size<<"-init_nb_indiv-"<<config::init_nb_indiv<<"-recomb_rate-"
+	<<config::recomb_rate<<"-seed-"<<config::seed
 	<<"-exact_ghosts-"<<config::exact_ghosts<<".csv";
 	lineage.write_data(filename.str());
 	lineage.write_coal_data(filename.str());
