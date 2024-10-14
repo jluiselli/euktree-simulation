@@ -61,7 +61,6 @@ namespace config{
 	uint32_t pop_size = 2000;
 	double recomb_rate = 1/((double)chrlen);	
 	uint32_t seed = 432498743;
-	bool exact_ghosts = true;
 	uint32_t init_nb_indiv = 0;
 }
 
@@ -617,10 +616,6 @@ public:
 				cur_seglist->add( i, c, 0, 0, config::chrlen -1 );    
 				cur_seglist->add( i, c, 1, 0, config::chrlen -1 );
 			}
-			/*if (config::exact_ghosts){
-				set<uint32_t>New_set({uint32_t(i)});
-				cur_pop->childs_ids_last_gen.emplace_back(New_set);
-			}*/
 		}
 
 		// data storage TODO : if we have the information of number of generations, 
@@ -702,7 +697,7 @@ public:
 		Lineage::check_fused_segments(*cur_seglist);
 
 		Lineage::record_stats_for_this_generation(*cur_pop, *cur_seglist);
-		if (config::exact_ghosts && all_common_anc == 0){
+		if (all_common_anc == 0){
 			// Deal with genealogical data to check coalescence
 			Lineage::check_coalescence();
 		}
@@ -839,13 +834,8 @@ public:
 		nb_ind_genealogical_ancestors.emplace_back(std::accumulate(pop.members.begin(), pop.members.end(), 0));
 
 		if (all_common_anc != 0){
-			if (config::exact_ghosts || back_time > all_common_anc){
-				// all genealogical ancestors are the ancestors of everybody
-				super_ghosts.emplace_back(nb_ind_genealogical_ancestors.back() - nb_ind_genetic_ancestors.back());
-			}
-			else {
-				super_ghosts.emplace_back(0);
-			}
+			// all genealogical ancestors are the ancestors of everybody
+			super_ghosts.emplace_back(nb_ind_genealogical_ancestors.back() - nb_ind_genetic_ancestors.back());
 		}
 		//below is now handled by check coalescence
 		/*else if (first_common_anc == 0){
@@ -1158,14 +1148,13 @@ void print_help(){
 	<<" init_nb_indiv : whole population.\n"
 	<<" recomb_rate : "<<config::recomb_rate<<"\n"
 	<<" seed : "<<config::seed<<"\n"
-	<<" exact_ghosts : "<<config::exact_ghosts<<" (should be 0 or 1)\n"
 	<<"\nIf nb_gen provided is 0, simulation will run until it approaches the equilibrium.\n";
 }
 
 
 void interpret_cmd_line_options(int argc, char* argv[]) {
   // Define allowed options
-  const char * options_list = "hc:l:g:p:r:s:e:i:";
+  const char * options_list = "hc:l:g:p:r:s:i:";
   static struct option long_options_list[] = {
       {"help",      no_argument,        nullptr, 'h'},
       {"nbchr",     required_argument,  nullptr, 'c'},
@@ -1174,7 +1163,6 @@ void interpret_cmd_line_options(int argc, char* argv[]) {
       {"pop_size",  required_argument,  nullptr, 'p'},
 	  {"recomb_rate",  required_argument,  nullptr, 'r'},
 	  {"seed",      required_argument,  nullptr, 's'},
-	  {"exact_ghosts", required_argument, nullptr, 'e'},
 	  {"init_nb_indiv", required_argument, nullptr, 'i'}
 	//   {"recomb_nb",  no_argument,  nullptr, 'R'},
   };
@@ -1212,10 +1200,6 @@ void interpret_cmd_line_options(int argc, char* argv[]) {
         config::seed = atol(optarg);
         break;
       }
-	  case 'e' : {
-        config::exact_ghosts = atoi(optarg);
-        break;
-      }
 	  case 'i' : {
 		config::init_nb_indiv = atol(optarg);
 	  }
@@ -1236,19 +1220,11 @@ int main(int argc, char* argv[]) {
 	
 	rando_mp::init(config::seed);
 
-	/*if (config::pop_size > 4000 && config::exact_ghosts){
-		std::cout<<"\n!! Using exact_ghosts and a big population size is not recommended. Auto-conversion to non-exact ghosts\n\n";
-		config::exact_ghosts=false;
-	}*/
 
 
 	uint32_t step_print = 10;
 
 	Lineage lineage;
-	if (!config::exact_ghosts){
-		lineage.first_common_anc = 10 * log(config::pop_size);
-		lineage.all_common_anc = 10 * log(config::pop_size);
-	}
 	cout<<"Starting simulation   s="<<lineage.cur_seglist->get_total_nb_segments()<<"   nbases="<<lineage.cur_seglist->get_total_segment_size()<<endl;
 
 	bool should_continue = true;
@@ -1278,8 +1254,7 @@ int main(int argc, char* argv[]) {
 	stringstream filename;
 	filename << "nbchr-"<<config::nbchr<<"-chrlen-"<<config::chrlen<<"-nb_gen-"<<config::nb_gen
 	<<"-pop_size-"<<config::pop_size<<"-init_nb_indiv-"<<config::init_nb_indiv<<"-recomb_rate-"
-	<<config::recomb_rate<<"-seed-"<<config::seed
-	<<"-exact_ghosts-"<<config::exact_ghosts<<".csv";
+	<<config::recomb_rate<<"-seed-"<<config::seed<<".csv";
 	lineage.write_data(filename.str());
 	lineage.write_coal_data(filename.str());
 
