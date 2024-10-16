@@ -691,11 +691,11 @@ public:
 		tmp_nb_seg_coalescences = 0;
 		Lineage::check_fused_segments(*cur_seglist);
 
-		Lineage::record_stats_for_this_generation(*cur_pop, *cur_seglist);
 		if (all_common_anc == 0){
 			// Deal with genealogical data to check coalescence
 			Lineage::check_coalescence();
 		}
+		Lineage::record_stats_for_this_generation(*cur_pop, *cur_seglist);
 		
 		back_time++;
 	}
