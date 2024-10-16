@@ -61,7 +61,7 @@ namespace config{
 	uint32_t pop_size = 2000;
 	double recomb_rate = 1/((double)chrlen);	
 	uint32_t seed = 432498743;
-	bool exact_ghosts = true;
+	uint32_t init_nb_indiv = 0;
 }
 
 
@@ -606,15 +606,11 @@ public:
 		cur_seglist = new SegmentList();
 		temp_seglist = new SegmentList();
 
-		for (size_t i = 0; i < config::pop_size; ++i){
+		for (size_t i = 0; i < config::init_nb_indiv; ++i){
 			for (size_t c = 0; c < config::nbchr; ++c){
 				cur_seglist->add( i, c, 0, 0, config::chrlen -1 );    
 				cur_seglist->add( i, c, 1, 0, config::chrlen -1 );
 			}
-			/*if (config::exact_ghosts){
-				set<uint32_t>New_set({uint32_t(i)});
-				cur_pop->childs_ids_last_gen.emplace_back(New_set);
-			}*/
 		}
 
 		// data storage TODO : if we have the information of number of generations, 
@@ -657,7 +653,7 @@ public:
 		std::ofstream data(filename);
 		data<<"backtime,nb_ind_genealogical_ancestors,nb_ind_genetic_ancestors,nb_chr_genetic_ancestors";
 		data<<",nb_segments,nb_fusions,nb_seg_coal,nb_splits,nb_bases,nb_super_ghosts"<<std::endl;
-		for (uint32_t t = 0; t < back_time; t++){
+		for (uint32_t t = 0; t < back_time+1; t++){
 			data<<t<<","<<nb_ind_genealogical_ancestors[t]<<","<<nb_ind_genetic_ancestors[t]<<","<<nb_chr_genetic_ancestors[t]<<",";
 			data<<nb_segments[t]<<","<<nb_fusions[t]<<","<<nb_seg_coalescences[t]<<","<<nb_splits[t]<<","<<nb_bases[t]<<","<<super_ghosts[t]<<'\n';
 		}
@@ -695,11 +691,11 @@ public:
 		tmp_nb_seg_coalescences = 0;
 		Lineage::check_fused_segments(*cur_seglist);
 
-		Lineage::record_stats_for_this_generation(*cur_pop, *cur_seglist);
-		if (config::exact_ghosts && all_common_anc == 0){
+		if (all_common_anc == 0){
 			// Deal with genealogical data to check coalescence
 			Lineage::check_coalescence();
 		}
+		Lineage::record_stats_for_this_generation(*cur_pop, *cur_seglist);
 		
 		back_time++;
 	}
@@ -833,13 +829,8 @@ public:
 		nb_ind_genealogical_ancestors.emplace_back(std::accumulate(pop.members.begin(), pop.members.end(), 0));
 
 		if (all_common_anc != 0){
-			if (config::exact_ghosts || back_time > all_common_anc){
-				// all genealogical ancestors are the ancestors of everybody
-				super_ghosts.emplace_back(nb_ind_genealogical_ancestors.back() - nb_ind_genetic_ancestors.back());
-			}
-			else {
-				super_ghosts.emplace_back(0);
-			}
+			// all genealogical ancestors are the ancestors of everybody
+			super_ghosts.emplace_back(nb_ind_genealogical_ancestors.back() - nb_ind_genetic_ancestors.back());
 		}
 		//below is now handled by check coalescence
 		/*else if (first_common_anc == 0){
@@ -1058,6 +1049,7 @@ public:
 								r += 1; //nothing happens
 							}
 							else {
+								#pragma omp atomic
 								tmp_nb_splits++;
 								int seg_begin = seg.a;
 								if (r > 0 and recomb_pos_list[r - 1] > seg.a and recomb_pos_list[r - 1] <= seg.b)
@@ -1112,9 +1104,14 @@ public:
 					//cout<<"segbef.a="<<seg.a<<" segbef.b="<<seg.b<<endl;
 					Segment& segprev = cur_seglist.get(i - 1, chrno, chrindex);
 			    		if (seg.individ == segprev.individ && seg.a <= segprev.b+1){
-							if (segprev.b+1 == seg.a){ tmp_nb_seg_coalescences++; }
-							else { tmp_nb_fusions++; }
-						
+							if (segprev.b+1 == seg.a){
+								#pragma omp atomic
+								tmp_nb_seg_coalescences++;
+							}
+							else {
+								#pragma omp atomic
+								tmp_nb_fusions++;
+							}
 						//seg.a = segprev.a;
 						//seg.b = max(seg.b,segprev.b);
 						
@@ -1124,7 +1121,7 @@ public:
 			    		}
 				}
 
-				
+
 				cur_seglist.remove_indices(chrno, chrindex, indices_to_delete);	
 					
 			}
@@ -1141,24 +1138,24 @@ public:
 
 void print_help(){
 	std::cout<<"Command line usage:\n"
-	<<"./simchr -c nb_of_chrsm -l chrsm_len -g nb_generations -p population_size -r recombination_rate -s seed_for_prng\n"
+	<<"./simchr -c nb_of_chrsm -l chrsm_len -g nb_generations -p population_size -i init_nb_indiv -r recombination_rate -s seed_for_prng\n"
 	<<"or \n"
-	<<"./simchr --nbchr nb_of_chrsm --chrlen chrsm_len --nb_gen nb_generations --pop_size population_size --recomb_rate recombination_rate --seed seed_for_prng\n"
+	<<"./simchr --nbchr nb_of_chrsm --chrlen chrsm_len --nb_gen nb_generations --pop_size population_size --init_nb_indiv nb_of_indiv_to_init_segments --recomb_rate recombination_rate --seed seed_for_prng\n"
 	<<"or any combination of short/long name ! No parameter is mandatory. In absence of specifications, default values are:\n"
 	<<" nbchr : "<<config::nbchr<<"\n"
 	<<" chrlen : "<<config::chrlen<<"\n"
 	<<" nb_gen : "<<config::nb_gen<<"\n"
 	<<" pop_size : "<<config::pop_size<<"\n"
+	<<" init_nb_indiv : whole population.\n"
 	<<" recomb_rate : "<<config::recomb_rate<<"\n"
 	<<" seed : "<<config::seed<<"\n"
-	<<" exact_ghosts : "<<config::exact_ghosts<<" (should be 0 or 1)\n"
 	<<"\nIf nb_gen provided is 0, simulation will run until it approaches the equilibrium.\n";
 }
 
 
 void interpret_cmd_line_options(int argc, char* argv[]) {
   // Define allowed options
-  const char * options_list = "hc:l:g:p:r:s:e:";
+  const char * options_list = "hc:l:g:p:r:s:i:";
   static struct option long_options_list[] = {
       {"help",      no_argument,        nullptr, 'h'},
       {"nbchr",     required_argument,  nullptr, 'c'},
@@ -1167,7 +1164,7 @@ void interpret_cmd_line_options(int argc, char* argv[]) {
       {"pop_size",  required_argument,  nullptr, 'p'},
 	  {"recomb_rate",  required_argument,  nullptr, 'r'},
 	  {"seed",      required_argument,  nullptr, 's'},
-	  {"exact_ghosts", required_argument, nullptr, 'e'}
+	  {"init_nb_indiv", required_argument, nullptr, 'i'}
 	//   {"recomb_nb",  no_argument,  nullptr, 'R'},
   };
 
@@ -1204,10 +1201,9 @@ void interpret_cmd_line_options(int argc, char* argv[]) {
         config::seed = atol(optarg);
         break;
       }
-	  case 'e' : {
-        config::exact_ghosts = atoi(optarg);
-        break;
-      }
+	  case 'i' : {
+		config::init_nb_indiv = atol(optarg);
+	  }
     }
   }
 }
@@ -1217,22 +1213,19 @@ void interpret_cmd_line_options(int argc, char* argv[]) {
 int main(int argc, char* argv[]) {
 
 	interpret_cmd_line_options(argc, argv);
+	if (config::init_nb_indiv == 0){
+		std::cout<<"init_nb_indiv not specified, follow whole population"<<std::endl;
+		// If not specified, we use the whole population as starting point
+		config::init_nb_indiv = config::pop_size;
+	}
 	
 	rando_mp::init(config::seed);
 
-	/*if (config::pop_size > 4000 && config::exact_ghosts){
-		std::cout<<"\n!! Using exact_ghosts and a big population size is not recommended. Auto-conversion to non-exact ghosts\n\n";
-		config::exact_ghosts=false;
-	}*/
 
 
 	uint32_t step_print = 10;
 
 	Lineage lineage;
-	if (!config::exact_ghosts){
-		lineage.first_common_anc = 10 * log(config::pop_size);
-		lineage.all_common_anc = 10 * log(config::pop_size);
-	}
 	cout<<"Starting simulation   s="<<lineage.cur_seglist->get_total_nb_segments()<<"   nbases="<<lineage.cur_seglist->get_total_segment_size()<<endl;
 
 	bool should_continue = true;
@@ -1261,8 +1254,8 @@ int main(int argc, char* argv[]) {
 	}
 	stringstream filename;
 	filename << "nbchr-"<<config::nbchr<<"-chrlen-"<<config::chrlen<<"-nb_gen-"<<config::nb_gen
-	<<"-pop_size-"<<config::pop_size<<"-recomb_rate-"<<config::recomb_rate<<"-seed-"<<config::seed
-	<<"-exact_ghosts-"<<config::exact_ghosts<<".csv";
+	<<"-pop_size-"<<config::pop_size<<"-init_nb_indiv-"<<config::init_nb_indiv<<"-recomb_rate-"
+	<<config::recomb_rate<<"-seed-"<<config::seed<<".csv";
 	lineage.write_data(filename.str());
 	lineage.write_coal_data(filename.str());
 
