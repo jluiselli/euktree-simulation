@@ -653,7 +653,7 @@ public:
 		std::ofstream data(filename);
 		data<<"backtime,nb_ind_genealogical_ancestors,nb_ind_genetic_ancestors,nb_chr_genetic_ancestors";
 		data<<",nb_segments,nb_fusions,nb_seg_coal,nb_splits,nb_bases,nb_super_ghosts"<<std::endl;
-		for (uint32_t t = 0; t < back_time; t++){
+		for (uint32_t t = 0; t < back_time+1; t++){
 			data<<t<<","<<nb_ind_genealogical_ancestors[t]<<","<<nb_ind_genetic_ancestors[t]<<","<<nb_chr_genetic_ancestors[t]<<",";
 			data<<nb_segments[t]<<","<<nb_fusions[t]<<","<<nb_seg_coalescences[t]<<","<<nb_splits[t]<<","<<nb_bases[t]<<","<<super_ghosts[t]<<'\n';
 		}
