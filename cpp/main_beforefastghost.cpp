@@ -807,6 +807,7 @@ public:
 								r += 1; //nothing happens
 							}
 							else {
+								#pragma omp atomic
 								tmp_nb_splits++;
 								int seg_begin = seg.a;
 								if (r > 0 and recomb_pos_list[r - 1] > seg.a and recomb_pos_list[r - 1] <= seg.b)
@@ -861,8 +862,14 @@ public:
 					//cout<<"segbef.a="<<seg.a<<" segbef.b="<<seg.b<<endl;
 					Segment& segprev = cur_seglist.get(i - 1, chrno, chrindex);
 			    		if (seg.individ == segprev.individ && seg.a <= segprev.b+1){
-							if (segprev.b+1 == seg.a){ tmp_nb_seg_coalescences++; }
-							else { tmp_nb_fusions++; }
+							if (segprev.b+1 == seg.a){
+								#pragma omp atomic
+								tmp_nb_seg_coalescences++;
+								}
+							else {
+								#pragma omp atomic
+								tmp_nb_fusions++;
+								}
 						
 						//seg.a = segprev.a;
 						//seg.b = max(seg.b,segprev.b);
