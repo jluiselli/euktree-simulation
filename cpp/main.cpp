@@ -431,7 +431,7 @@ public:
 	
 	
 	uint32_t get_number_of_chunks(){
-		return ceil( (float)config::init_nb_indiv / (float)chunk_size );
+		return ceil( (float)config::pop_size / (float)chunk_size );
 	}
 	
 	
@@ -463,7 +463,6 @@ public:
 		//[i1, i2) = range of indivs in chunk
 		uint32_t i1 = chunk_no * this->chunk_size;
 		uint32_t i2 = min( (chunk_no + 1) * this->chunk_size, config::pop_size );
-		uint32_t nb_followed_ind_in_chunk = 0;
 		
 		
 		//cur_desc[i] = set of descendants of indiv i in the range [i1, i2 - 1] in current generation (init gen = 0)
@@ -473,11 +472,7 @@ public:
 		
 		//at gen = 0, descendants of i is only i itself
 		for (uint32_t i = i1; i < i2; ++i){
-			if (i < config::init_nb_indiv){
-				cur_desc[i].set(i);	//sets bits in order
-				nb_followed_ind_in_chunk++;
-			}
-			// else : not an offspring we want to follow
+			cur_desc[i].set(i);	//sets bits in order
 		}
 		
 		
@@ -511,7 +506,7 @@ public:
 			
 			//if any indiv has the whole chunk as descendants, we record it
 			for (uint32_t i = 0; i < config::pop_size; ++i){
-				if (cur_desc[i].numberOfOnes() == nb_followed_ind_in_chunk){
+				if (cur_desc[i].numberOfOnes() == (i2 - i1)){
 					retvec[g].set(i);	//sets bits in order
 				}
 			}
