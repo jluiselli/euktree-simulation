@@ -487,7 +487,7 @@ public:
 			//the loop below assumes that cur_desc contains the chunk descendants of every indiv for 
 			//gen g-1, and puts into next_desc the descendants of gen g for each indiv, by taking the union of desc of their children.
 			
-			#pragma omp parallel for num_threads(4)
+			#pragma omp parallel for
 			for (uint32_t i = 0; i < config::pop_size; ++i){
 				next_desc[i].reset();
 				
@@ -1138,9 +1138,11 @@ public:
 
 void print_help(){
 	std::cout<<"Command line usage:\n"
-	<<"./simchr -c nb_of_chrsm -l chrsm_len -g nb_generations -p population_size -i init_nb_indiv -r recombination_rate -s seed_for_prng\n"
+	<<"./simchr -c nb_of_chrsm -l chrsm_len -g nb_generations -p population_size -i init_nb_indiv -r recombination_rate -s seed_for_prng"
+	<<" -t nb_threads\n"
 	<<"or \n"
-	<<"./simchr --nbchr nb_of_chrsm --chrlen chrsm_len --nb_gen nb_generations --pop_size population_size --init_nb_indiv nb_of_indiv_to_init_segments --recomb_rate recombination_rate --seed seed_for_prng\n"
+	<<"./simchr --nbchr nb_of_chrsm --chrlen chrsm_len --nb_gen nb_generations --pop_size population_size --init_nb_indiv nb_of_indiv_to_init_segments --recomb_rate recombination_rate --seed seed_for_prng"
+	<<" --threads nb_threads\n"
 	<<"or any combination of short/long name ! No parameter is mandatory. In absence of specifications, default values are:\n"
 	<<" nbchr : "<<config::nbchr<<"\n"
 	<<" chrlen : "<<config::chrlen<<"\n"
@@ -1155,7 +1157,7 @@ void print_help(){
 
 void interpret_cmd_line_options(int argc, char* argv[]) {
   // Define allowed options
-  const char * options_list = "hc:l:g:p:r:s:i:";
+  const char * options_list = "hc:l:g:p:r:s:i:t:";
   static struct option long_options_list[] = {
       {"help",      no_argument,        nullptr, 'h'},
       {"nbchr",     required_argument,  nullptr, 'c'},
@@ -1164,7 +1166,8 @@ void interpret_cmd_line_options(int argc, char* argv[]) {
       {"pop_size",  required_argument,  nullptr, 'p'},
 	  {"recomb_rate",  required_argument,  nullptr, 'r'},
 	  {"seed",      required_argument,  nullptr, 's'},
-	  {"init_nb_indiv", required_argument, nullptr, 'i'}
+	  {"init_nb_indiv", required_argument, nullptr, 'i'},
+	  {"threads",  required_argument, nullptr, 't'}
 	//   {"recomb_nb",  no_argument,  nullptr, 'R'},
   };
 
@@ -1203,6 +1206,11 @@ void interpret_cmd_line_options(int argc, char* argv[]) {
       }
 	  case 'i' : {
 		config::init_nb_indiv = atol(optarg);
+		break;
+	  }
+	  case 't' : {
+		omp_set_num_threads(atol(optarg));
+		break;
 	  }
     }
   }
@@ -1223,7 +1231,7 @@ int main(int argc, char* argv[]) {
 
 
 
-	uint32_t step_print = 10;
+	uint32_t step_print = 1000;
 
 	Lineage lineage;
 	cout<<"Starting simulation   s="<<lineage.cur_seglist->get_total_nb_segments()<<"   nbases="<<lineage.cur_seglist->get_total_segment_size()<<endl;
